@@ -18,7 +18,7 @@ const SearchSchema = z.object({
     .enum(['best_deal', 'newest', 'cheapest', 'safest', 'most_relevant'])
     .optional()
     .default('best_deal'),
-  limit: z.coerce.number().min(1).max(50).optional().default(25),
+  limit: z.coerce.number().min(1).max(100).optional().default(50),
 });
 
 function buildAdapters(): SourceAdapter[] {

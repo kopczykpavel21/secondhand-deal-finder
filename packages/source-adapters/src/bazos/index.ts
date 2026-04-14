@@ -168,8 +168,9 @@ export class BazosAdapter extends BaseAdapter {
     query: string,
     filters?: SearchFilters,
   ): Promise<NormalizedListing[]> {
-    // Fetch 3 pages in parallel (20 results each → up to 60 total)
-    const urls = [0, 20, 40].map((start) => this.buildSearchUrl(query, filters, start));
+    // Fetch 5 pages sequentially to avoid duplicate-page detection issues
+    // Bazoš paginates via &start=N (20 per page → up to 100 results)
+    const urls = [0, 20, 40, 60, 80].map((start) => this.buildSearchUrl(query, filters, start));
     this.log(`Fetching ${urls.length} pages in parallel`);
 
     const htmlPages = await Promise.all(

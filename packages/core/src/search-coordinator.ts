@@ -33,8 +33,8 @@ class DeferredQueue<T> {
   }
 }
 
-const DEFAULT_LIMIT = 25;
-const MAX_LIMIT = 50;
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
 
 // ─── Result cache ─────────────────────────────────────────────────────────────
 // Caches complete search responses for CACHE_TTL_MS to avoid re-scraping
