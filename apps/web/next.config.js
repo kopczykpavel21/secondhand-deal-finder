@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   transpilePackages: ['@sdf/types', '@sdf/core', '@sdf/scoring', '@sdf/source-adapters'],
   experimental: {
     // Playwright must NOT be bundled by webpack — it relies on native binaries
