@@ -1,9 +1,7 @@
-const path = require('path');
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    '/Users/Pavel/Downloads/Alexandra_Web/secondhand-deal-finder/apps/web/src/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
