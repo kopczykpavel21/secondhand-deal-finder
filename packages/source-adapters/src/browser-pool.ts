@@ -8,7 +8,8 @@
 import { chromium } from 'playwright';
 import type { Browser, BrowserContext, Page } from 'playwright';
 
-const MAX_CONTEXTS = 6;
+// Keep concurrency low — Railway free tier has 1 GB RAM shared with Next.js
+const MAX_CONTEXTS = 2;
 
 // ─── Semaphore ────────────────────────────────────────────────────────────────
 
@@ -44,16 +45,30 @@ const sem = new Semaphore(MAX_CONTEXTS);
 let sharedBrowser: Browser | null = null;
 
 async function getSharedBrowser(): Promise<Browser> {
-  if (!sharedBrowser || !sharedBrowser.isConnected()) {
+  // Reset dead browser before trying to reuse it
+  if (sharedBrowser && !sharedBrowser.isConnected()) {
+    sharedBrowser = null;
+  }
+  if (!sharedBrowser) {
     sharedBrowser = await chromium.launch({
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',  // prevents crashes on low /dev/shm in containers
+        '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--disable-extensions',
+        '--disable-default-apps',
+        '--no-first-run',
+        '--disable-background-networking',
+        '--disable-sync',
+        '--disable-translate',
+        '--hide-scrollbars',
+        '--mute-audio',
       ],
     });
+    // Auto-clear reference when browser unexpectedly closes
+    sharedBrowser.on('disconnected', () => { sharedBrowser = null; });
   }
   return sharedBrowser;
 }
