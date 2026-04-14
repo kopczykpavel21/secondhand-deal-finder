@@ -19,16 +19,13 @@ RUN npm ci
 RUN npx playwright install-deps chromium
 RUN npx playwright install chromium
 
-# Ensure public dir always exists (BuildKit cache may skip the COPY . . layer)
+# Ensure public dir exists
 RUN mkdir -p apps/web/public
 
 # Build Next.js (standalone output)
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-
-# Run build and write full output to a file so Railway shows it on failure
-RUN npm run build --workspace=apps/web > /tmp/build-stdout.log 2> /tmp/build-stderr.log; echo $? > /tmp/build-exit.log
-RUN EXIT=$(cat /tmp/build-exit.log); echo "--- STDOUT ---"; cat /tmp/build-stdout.log; echo "--- STDERR ---"; cat /tmp/build-stderr.log; exit $EXIT
+RUN npm run build --workspace=apps/web
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runner
@@ -37,11 +34,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Playwright runtime system libraries
+# Playwright runtime system libraries + curl (cache-bust: v3)
 RUN apt-get update && apt-get install -y \
     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-    libxfixes3 libxrandr2 libgbm1 libasound2 \
+    libxfixes3 libxrandr2 libgbm1 libasound2 curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy standalone Next.js output
