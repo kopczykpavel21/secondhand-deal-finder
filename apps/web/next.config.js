@@ -3,9 +3,35 @@ const nextConfig = {
   output: 'standalone',
   transpilePackages: ['@sdf/types', '@sdf/core', '@sdf/scoring', '@sdf/source-adapters'],
   experimental: {
-    // Playwright must NOT be bundled by webpack — it relies on native binaries
-    // and dynamic requires. Mark it external so Next.js uses node_modules at runtime.
-    serverComponentsExternalPackages: ['playwright', 'playwright-core'],
+    serverComponentsExternalPackages: [
+      'playwright',
+      'playwright-core',
+      'generic-pool',
+    ],
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Prevent webpack from bundling playwright and its dependencies —
+      // they rely on native binaries and must stay as node_modules at runtime.
+      const playwrightModules = [
+        'playwright',
+        'playwright-core',
+        /^playwright\/.*/,
+        /^playwright-core\/.*/,
+      ];
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+        ({ request }, callback) => {
+          if (playwrightModules.some((m) =>
+            typeof m === 'string' ? request === m : m.test(request)
+          )) {
+            return callback(null, `commonjs ${request}`);
+          }
+          callback();
+        },
+      ];
+    }
+    return config;
   },
   images: {
     remotePatterns: [

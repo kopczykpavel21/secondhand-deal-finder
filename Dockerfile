@@ -19,16 +19,13 @@ RUN npm ci
 RUN npx playwright install-deps chromium
 RUN npx playwright install chromium
 
-# Build Next.js (standalone output) — capture full output so errors are visible in Railway logs
+# Build Next.js (standalone output)
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-RUN npm run build --workspace=apps/web 2>&1 | tee /tmp/build.log; \
-    BUILD_EXIT=${PIPESTATUS[0]}; \
-    if [ "$BUILD_EXIT" != "0" ]; then \
-      echo "=== FULL BUILD LOG ==="; \
-      cat /tmp/build.log; \
-      exit 1; \
-    fi
+
+# Run build and write full output to a file so Railway shows it on failure
+RUN npm run build --workspace=apps/web > /tmp/build-stdout.log 2> /tmp/build-stderr.log; echo $? > /tmp/build-exit.log
+RUN EXIT=$(cat /tmp/build-exit.log); echo "--- STDOUT ---"; cat /tmp/build-stdout.log; echo "--- STDERR ---"; cat /tmp/build-stderr.log; exit $EXIT
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runner
