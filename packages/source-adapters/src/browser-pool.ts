@@ -45,7 +45,15 @@ let sharedBrowser: Browser | null = null;
 
 async function getSharedBrowser(): Promise<Browser> {
   if (!sharedBrowser || !sharedBrowser.isConnected()) {
-    sharedBrowser = await chromium.launch({ headless: true });
+    sharedBrowser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',  // prevents crashes on low /dev/shm in containers
+        '--disable-gpu',
+      ],
+    });
   }
   return sharedBrowser;
 }
