@@ -1,54 +1,32 @@
 # ─── Build stage ──────────────────────────────────────────────────────────────
+# Plain Node image — no Playwright browser download needed here
 FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
-# System deps required by Playwright install-deps
-RUN apt-get update && apt-get install -y \
-    curl wget ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy the full repo first so npm workspace symlinks resolve correctly
 COPY . .
 
-# Install node deps — skip Playwright's postinstall browser download (we do it manually)
+# Skip browser download — the runtime image already has browsers pre-installed
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci
 
-# Install Playwright system libraries + Chromium browser binary
-RUN npx playwright install-deps chromium
-RUN npx playwright install chromium
-
-# Ensure public dir exists
-RUN mkdir -p apps/web/public
-
-# Build Next.js (standalone output)
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build --workspace=apps/web
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
-FROM node:20-bookworm-slim AS runner
+# Official Playwright image — Chromium + all 100+ system deps pre-installed
+# No need to download browsers or install deps manually
+FROM mcr.microsoft.com/playwright:v1.59.1-jammy AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install ALL Playwright system deps using the builder's node_modules
-# (the manual list of 12 libs was missing ~90 packages Chromium needs)
-COPY --from=builder /app/node_modules /tmp/node_modules
-RUN /tmp/node_modules/.bin/playwright install-deps chromium \
-    && rm -rf /tmp/node_modules
-
-# Copy standalone Next.js output
+# Copy standalone Next.js output from builder
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-# public/ is empty — create it directly rather than copying from builder
 RUN mkdir -p ./apps/web/public
-
-# Copy Playwright browser binaries
-COPY --from=builder /root/.cache/ms-playwright /root/.cache/ms-playwright
-ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
 EXPOSE 3000
 
