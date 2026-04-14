@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(kill 90887)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const { BazosAdapter } = require\\('./packages/source-adapters/src/bazos/index.ts'\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 5 http://localhost:3000/api/search/stream?query=test)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 5 \"http://localhost:3000/api/search/stream?query=test\")",
+      "Bash(curl -s --max-time 3 -D - \"http://localhost:3000/api/search/stream?query=test\")",
+      "Bash(curl -s --max-time 8 -D - \"http://localhost:3000/api/search/stream?query=test\")",
+      "Bash(node -e ':*)",
+      "Bash(gh auth:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m 'Initial commit — Secondhand Deal Finder MVP:*)"
+    ]
+  }
+}
