@@ -36,6 +36,11 @@ class DeferredQueue<T> {
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
+// Hard wall-clock limit per source adapter.  Playwright adapters (Sbazar,
+// Vinted) can retry internally up to 2×, so keep this above 2 × 20 s = 40 s.
+// HTTP adapters (Bazoš, Aukro) finish in < 5 s so the timeout never triggers.
+const ADAPTER_TIMEOUT_MS = 55_000;
+
 // ─── Result cache ─────────────────────────────────────────────────────────────
 // Caches complete search responses for CACHE_TTL_MS to avoid re-scraping
 // identical queries within the same server session.
@@ -238,7 +243,18 @@ export class SearchCoordinator {
   }> {
     const t0 = Date.now();
     try {
-      const listings = await adapter.searchListings(query, filters);
+      // Race the adapter against a hard wall-clock deadline so a hung
+      // Playwright page (blocked IP, networkidle that never fires, OOM during
+      // a retry) cannot hold up the entire search stream indefinitely.
+      const listings = await Promise.race([
+        adapter.searchListings(query, filters),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`source timed out after ${ADAPTER_TIMEOUT_MS / 1000}s`)),
+            ADAPTER_TIMEOUT_MS,
+          ),
+        ),
+      ]);
       const logs = (adapter as unknown as { flushLogs?: () => string[] }).flushLogs?.() ?? [];
       return {
         status: {

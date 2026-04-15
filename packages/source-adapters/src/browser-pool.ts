@@ -13,6 +13,11 @@ import type { Browser, BrowserContext, Page } from 'playwright';
 // crashes the shared Chromium process and invalidates both contexts.
 const MAX_CONTEXTS = 1;
 
+// Hard cap on how long a single page operation may run (navigation + fn).
+// Adapters have their own shorter timeouts for individual waitForSelector
+// calls; this is a last-resort backstop.
+const PAGE_OP_TIMEOUT_MS = 45_000;
+
 // ─── Semaphore ────────────────────────────────────────────────────────────────
 
 class Semaphore {
@@ -52,7 +57,7 @@ async function getSharedBrowser(): Promise<Browser> {
     sharedBrowser = null;
   }
   if (!sharedBrowser) {
-    sharedBrowser = await chromium.launch({
+    const thisBrowser = await chromium.launch({
       headless: true,
       args: [
         '--no-sandbox',
@@ -69,8 +74,12 @@ async function getSharedBrowser(): Promise<Browser> {
         '--mute-audio',
       ],
     });
-    // Auto-clear reference when browser unexpectedly closes
-    sharedBrowser.on('disconnected', () => { sharedBrowser = null; });
+    sharedBrowser = thisBrowser;
+    // ⚠️  Capture the instance by value — if a NEW browser is launched before
+    // this one fires 'disconnected', the handler must not wipe out the new ref.
+    thisBrowser.on('disconnected', () => {
+      if (sharedBrowser === thisBrowser) sharedBrowser = null;
+    });
   }
   return sharedBrowser;
 }
@@ -90,16 +99,42 @@ async function newContext(): Promise<BrowserContext> {
 
 /**
  * Acquire a semaphore slot, open a browser context+page, run fn, then release.
- * Errors in fn are propagated; resources are always cleaned up.
+ *
+ * Resilience features:
+ * - If the browser crashes between acquire() and newContext() (e.g. OOM in
+ *   the previous operation), we null-out sharedBrowser and retry once so the
+ *   next call gets a fresh process instead of a permanent error.
+ * - A hard PAGE_OP_TIMEOUT_MS deadline races against fn() so a stuck page
+ *   can't block the semaphore slot forever.
+ * - Default navigation / action timeouts are set on the page object so even
+ *   Playwright waitFor* calls that don't specify a timeout are bounded.
  */
 export async function withPooledPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
   await sem.acquire();
   let ctx: BrowserContext | null = null;
   try {
-    ctx = await newContext();
+    // If the browser died between acquire() and here, null it out and try once more.
+    ctx = await newContext().catch(async (err) => {
+      sharedBrowser = null;
+      // Small pause so the OS can reap the old process before we launch a new one
+      await sleep(500);
+      return newContext();
+    });
+
     const page = await ctx.newPage();
+
+    // Bound every navigation and Playwright wait call on this page
+    page.setDefaultNavigationTimeout(PAGE_OP_TIMEOUT_MS);
+    page.setDefaultTimeout(PAGE_OP_TIMEOUT_MS);
+
     try {
-      return await fn(page);
+      // Race fn against a hard deadline so a hung page never holds the semaphore
+      return await Promise.race([
+        fn(page),
+        sleep(PAGE_OP_TIMEOUT_MS).then(() => {
+          throw new Error(`withPooledPage: operation timed out after ${PAGE_OP_TIMEOUT_MS}ms`);
+        }),
+      ]);
     } finally {
       await page.close().catch(() => {});
     }
@@ -115,4 +150,8 @@ export async function closeBrowserPool(): Promise<void> {
     await sharedBrowser.close().catch(() => {});
     sharedBrowser = null;
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
