@@ -8,8 +8,10 @@
 import { chromium } from 'playwright';
 import type { Browser, BrowserContext, Page } from 'playwright';
 
-// Keep concurrency low — Railway free tier has 1 GB RAM shared with Next.js
-const MAX_CONTEXTS = 2;
+// Railway 1 GB RAM: run only one Playwright page at a time to prevent OOM.
+// Sbazar / Vinted each load a heavy React SPA — running them concurrently
+// crashes the shared Chromium process and invalidates both contexts.
+const MAX_CONTEXTS = 1;
 
 // ─── Semaphore ────────────────────────────────────────────────────────────────
 

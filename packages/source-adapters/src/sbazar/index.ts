@@ -51,10 +51,11 @@ export class SbazarAdapter extends BaseAdapter {
     super({ rateLimitMs: 2_000, ...config });
   }
 
-  buildSearchUrl(_query: string, _filters?: SearchFilters): string {
-    // Sbazar is an Astro SPA — direct URL parameters don't work for search.
-    // We navigate to the homepage and submit the search form instead.
-    return BASE_URL;
+  buildSearchUrl(query: string, filters?: SearchFilters): string {
+    const params = new URLSearchParams({ q: query });
+    if (filters?.priceMin != null) params.set('price_from', String(filters.priceMin));
+    if (filters?.priceMax != null) params.set('price_to', String(filters.priceMax));
+    return `${BASE_URL}/hledej?${params.toString()}`;
   }
 
   async searchListings(
@@ -74,14 +75,14 @@ export class SbazarAdapter extends BaseAdapter {
     const results: NormalizedListing[] = [];
 
     await this.withPage(async (page: Page) => {
+      // Navigate directly to the search results URL — avoids loading the heavy
+      // homepage and doing a form-submit dance, which halves memory usage.
       const url = this.buildSearchUrl(query, filters);
       this.log(`Fetching: ${url}`);
 
       // ── Strategy 1: intercept JSON API response ─────────────────────────────
-      // Sbazar fires multiple XHR calls as the page loads (homepage data, then
-      // search results). We collect ALL matching JSON responses and then pick
-      // the best one: prefer a response whose URL contains the search query,
-      // fall back to whichever response has the most items.
+      // Sbazar fires an internal XHR/fetch for search results as the page loads.
+      // We collect ALL matching JSON responses and pick the best one.
       const interceptedResponses: Array<{ respUrl: string; items: unknown[] }> = [];
 
       const onResponse = async (response: Response) => {
@@ -96,7 +97,6 @@ export class SbazarAdapter extends BaseAdapter {
 
           const data = await response.json();
 
-          // Log ALL JSON responses so we can identify the right one
           const topKeys = typeof data === 'object' && data !== null
             ? Object.keys(data as object).slice(0, 6).join(', ')
             : typeof data;
@@ -117,41 +117,22 @@ export class SbazarAdapter extends BaseAdapter {
       page.on('response', onResponse);
 
       try {
-        // Navigate to homepage — direct search URL params don't work on Sbazar
+        // Go straight to the search results page — one page load instead of two
         await page.goto(url, { timeout: this.config.timeout, waitUntil: 'domcontentloaded' });
 
-        // Dismiss GDPR consent banner before interacting with the page
-        await this.dismissConsentBanner(page);
-
-        // Find the search input and submit the query like a real user
-        const searchSubmitted = await this.submitSearchForm(page, query, filters);
-        if (!searchSubmitted) {
-          this.log('Could not find or submit search form');
-          return;
-        }
-
-        // Wait for the search results to load
-        await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {
-          this.log('networkidle timeout after search — proceeding anyway');
+        // Wait for network to settle so the listing API call completes
+        await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => {
+          this.log('networkidle timeout — proceeding with what was captured');
         });
 
-        // Extra buffer for any post-load API calls
-        await page.waitForTimeout(2_000);
+        // Small extra buffer for any late API calls
+        await page.waitForTimeout(1_500);
 
-        // Log final URL and a sample of DOM links for debugging
+        // Log final URL for debugging
         const finalUrl = page.url();
         this.log(`Final page URL: ${finalUrl}`);
-        const domLinks = await page.evaluate(() =>
-          Array.from(document.querySelectorAll('a[href]'))
-            .map((a) => a.getAttribute('href') ?? '')
-            .filter((h) => h.startsWith('/') || h.includes('sbazar'))
-            .slice(0, 15)
-        ).catch(() => [] as string[]);
-        this.log(`DOM links sample: ${domLinks.join(' | ')}`);
 
         if (interceptedResponses.length > 0) {
-          // Prefer the response whose URL contains the search query — that's
-          // the search-specific call, not homepage/featured content.
           const queryVariants = [
             query.toLowerCase(),
             encodeURIComponent(query).toLowerCase(),
@@ -161,7 +142,6 @@ export class SbazarAdapter extends BaseAdapter {
             interceptedResponses.find((r) =>
               queryVariants.some((v) => r.respUrl.toLowerCase().includes(v)),
             ) ??
-            // Fall back to whichever response has the most items
             interceptedResponses.sort((a, b) => b.items.length - a.items.length)[0];
 
           this.log(`Using API response from: ${best.respUrl} (${best.items.length} items)`);
@@ -319,87 +299,6 @@ export class SbazarAdapter extends BaseAdapter {
     });
 
     return results;
-  }
-
-  // ─── Search form submission ─────────────────────────────────────────────────
-
-  private async submitSearchForm(
-    page: Page,
-    query: string,
-    filters?: SearchFilters,
-  ): Promise<boolean> {
-    try {
-      // Find the search input — try several common selectors
-      const inputSelector = [
-        'input[name="q"]',
-        'input[name="query"]',
-        'input[name="hledej"]',
-        'input[type="search"]',
-        'input[placeholder*="Hledej"]',
-        'input[placeholder*="hledej"]',
-        'input[placeholder*="Co hledáte"]',
-        'input[placeholder*="Hledat"]',
-      ].join(', ');
-
-      const input = await page.waitForSelector(inputSelector, { timeout: 8_000 });
-      if (!input) {
-        this.log('Search input not found');
-        return false;
-      }
-
-      // Clear and type query
-      await input.click({ clickCount: 3 });
-      await input.type(query, { delay: 40 });
-      this.log(`Typed query: "${query}"`);
-
-      // Submit — press Enter (works on all forms)
-      await input.press('Enter');
-
-      // Wait briefly for navigation to start
-      await page.waitForTimeout(500);
-
-      // Apply price filters via URL if the search landed on a results page
-      const resultUrl = page.url();
-      this.log(`Search landed on: ${resultUrl}`);
-
-      if (filters?.priceMin != null || filters?.priceMax != null) {
-        const parsed = new URL(resultUrl);
-        if (filters.priceMin != null) parsed.searchParams.set('price_from', String(filters.priceMin));
-        if (filters.priceMax != null) parsed.searchParams.set('price_to', String(filters.priceMax));
-        await page.goto(parsed.toString(), { waitUntil: 'domcontentloaded' });
-      }
-
-      return true;
-    } catch (err) {
-      this.log(`Search form error: ${(err as Error).message}`);
-      return false;
-    }
-  }
-
-  // ─── Consent banner ────────────────────────────────────────────────────────
-
-  private async dismissConsentBanner(page: Page): Promise<void> {
-    try {
-      // Seznam.cz / Sbazar uses the SZNC consent framework.
-      // The "Accept all" button appears in several possible forms.
-      const btn = await page.$(
-        'button[data-consent-accept], ' +
-        'button[class*="agree"], ' +
-        'button[class*="accept"], ' +
-        'button[id*="accept"], ' +
-        'button:has-text("Přijmout vše"), ' +
-        'button:has-text("Souhlasím"), ' +
-        'button:has-text("Přijmout"), ' +
-        '[data-testid="cmpAcceptAllBtn"]',
-      );
-      if (btn) {
-        await btn.click();
-        await page.waitForTimeout(1_000);
-        this.log('Dismissed consent banner');
-      }
-    } catch {
-      // Non-critical — continue without dismissing
-    }
   }
 
   // ─── API interception helpers ───────────────────────────────────────────────
