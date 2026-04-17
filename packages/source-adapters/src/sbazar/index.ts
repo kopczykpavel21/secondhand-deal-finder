@@ -120,6 +120,51 @@ export class SbazarAdapter extends BaseAdapter {
         // Go straight to the search results page — one page load instead of two
         await page.goto(url, { timeout: this.config.timeout, waitUntil: 'domcontentloaded' });
 
+        // ── Handle Seznam.cz consent wall ──────────────────────────────────────
+        // Sbazar (owned by Seznam.cz) redirects to cmp.seznam.cz/nastaveni-souhlasu
+        // when the browser has no session cookies. The CMP requires user consent.
+        if (page.url().includes('cmp.seznam.cz') || page.url().includes('noredirect')) {
+          this.log('Consent wall detected — attempting to accept');
+
+          // Check if the CMP is in error-page mode (detected headless browser).
+          // In that case the main element has id="errorPage" and no consent buttons
+          // are rendered at all — bail out fast instead of waiting for them.
+          const isErrorPage = await page.evaluate(
+            () => !!document.getElementById('errorPage')
+          ).catch(() => false);
+
+          if (isErrorPage) {
+            this.log('CMP blocked headless browser (anti-bot error page) — skipping source');
+            return;
+          }
+
+          // Give the JS-rendered consent form up to 5 s to appear
+          const acceptBtn = await page.waitForSelector(
+            'button[data-dot="souhlasit-se-vsim"], ' +
+            'button[data-e2e="cmp-accept-all"], ' +
+            'button:has-text("Souhlasit se vším"), ' +
+            'button:has-text("Přijmout vše"), ' +
+            'button:has-text("Souhlasím se vším"), ' +
+            'button:has-text("Potvrdit vše"), ' +
+            'button:has-text("Souhlasím"), ' +
+            '#button-agree-all, .cmp-agree-all',
+            { timeout: 5_000 },
+          ).catch(() => null);
+
+          if (acceptBtn) {
+            await acceptBtn.click();
+            await page.waitForURL(/sbazar\.cz/, { timeout: 10_000 })
+              .catch(() => this.log('Redirect to Sbazar timed out after consent'));
+            this.log(`After consent redirect: ${page.url()}`);
+            // Wait for network to settle after the redirect
+            await page.waitForLoadState('networkidle', { timeout: 10_000 })
+              .catch(() => {});
+          } else {
+            this.log('No consent button found — cannot accept consent in headless mode');
+            return;
+          }
+        }
+
         // Wait for network to settle so the listing API call completes
         await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => {
           this.log('networkidle timeout — proceeding with what was captured');

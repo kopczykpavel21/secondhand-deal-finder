@@ -72,6 +72,8 @@ async function getSharedBrowser(): Promise<Browser> {
         '--disable-translate',
         '--hide-scrollbars',
         '--mute-audio',
+        // Anti-detection: hide automation signals from anti-bot systems
+        '--disable-blink-features=AutomationControlled',
       ],
     });
     sharedBrowser = thisBrowser;
@@ -86,13 +88,35 @@ async function getSharedBrowser(): Promise<Browser> {
 
 async function newContext(): Promise<BrowserContext> {
   const browser = await getSharedBrowser();
-  return browser.newContext({
+  const ctx = await browser.newContext({
     userAgent:
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     locale: 'cs-CZ',
     timezoneId: 'Europe/Prague',
     viewport: { width: 1280, height: 900 },
+    // Extra headers to look like a real browser
+    extraHTTPHeaders: {
+      'Accept-Language': 'cs-CZ,cs;q=0.9,en;q=0.8',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"',
+    },
   });
+
+  // Mask automation signals — prevents sites from detecting headless Chrome
+  await ctx.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    // Spoof plugins array (real browsers have plugins; headless has none)
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [1, 2, 3, 4, 5],
+    });
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['cs-CZ', 'cs', 'en'],
+    });
+  });
+
+  return ctx;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
