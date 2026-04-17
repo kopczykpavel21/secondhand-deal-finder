@@ -1,12 +1,12 @@
 # ─── Build stage ──────────────────────────────────────────────────────────────
-# Plain Node image — no Playwright browser download needed here
 FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
 COPY . .
 
-# Skip browser download — the runtime image already has browsers pre-installed
+# Skip browser download — Playwright is a dev dependency only (Sbazar/Facebook
+# adapters). The live adapters (Bazoš, Vinted, Aukro) use plain fetch().
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm ci
 
@@ -15,9 +15,10 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build --workspace=apps/web
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
-# Official Playwright image — Chromium + all 100+ system deps pre-installed
-# No need to download browsers or install deps manually
-FROM mcr.microsoft.com/playwright:v1.59.1-jammy AS runner
+# Plain slim Node image — no Playwright/Chromium needed at runtime.
+# Vinted, Bazoš and Aukro all use plain fetch(); Sbazar pre-checks and
+# falls back to Playwright only if the CMP wall is not detected (rare).
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production

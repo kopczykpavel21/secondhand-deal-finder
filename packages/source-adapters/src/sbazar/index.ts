@@ -62,10 +62,47 @@ export class SbazarAdapter extends BaseAdapter {
     query: string,
     filters?: SearchFilters,
   ): Promise<NormalizedListing[]> {
+    // ── Pre-check via plain HTTP (no browser!) ──────────────────────────────
+    // Sbazar redirects headless browsers to a CMP consent wall which itself
+    // shows an error page to bots — the browser can never get past it.
+    // A plain HEAD request tells us if the search URL is accessible before
+    // we spend time launching Chromium.
+    const preCheck = await this.isCmpBlocked(query, filters);
+    if (preCheck) {
+      this.log('Sbazar: CMP wall detected via pre-check — skipping (no browser launched)');
+      return [];
+    }
+
     return this.withRetry(
       () => this._scrape(query, filters),
       'sbazar.search',
     );
+  }
+
+  /**
+   * Check if Sbazar will redirect to the CMP consent wall by making a cheap
+   * HEAD request. Returns true if blocked.
+   */
+  private async isCmpBlocked(query: string, filters?: SearchFilters): Promise<boolean> {
+    try {
+      const url = this.buildSearchUrl(query, filters);
+      const res = await fetch(url, {
+        method: 'HEAD',
+        redirect: 'manual', // catch the redirect without following it
+        headers: {
+          'User-Agent': this.config.userAgent,
+          'Accept': 'text/html',
+          'Accept-Language': 'cs-CZ,cs;q=0.9',
+        },
+        signal: AbortSignal.timeout(5_000),
+      });
+      const location = res.headers.get('location') ?? '';
+      // Sbazar redirects to /0-vsechny-kategorie or cmp.seznam.cz when blocked
+      return res.status >= 300 && res.status < 400 &&
+        (location.includes('cmp.seznam.cz') || location.includes('vsechny-kategorie') || location.includes('noredirect'));
+    } catch {
+      return false; // network error — let the browser try
+    }
   }
 
   private async _scrape(
