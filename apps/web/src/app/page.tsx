@@ -7,7 +7,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { FilterPanel } from '@/components/FilterPanel';
 import { ResultCard } from '@/components/ResultCard';
 import { SourceStatusBar } from '@/components/SourceStatusBar';
-import { DebugPanel } from '@/components/DebugPanel';
+import { MethodologyPanel } from '@/components/MethodologyPanel';
 import { LoadingAnimation } from '@/components/LoadingAnimation';
 import { FeedbackModal } from '@/components/FeedbackModal';
 
@@ -111,19 +111,15 @@ export default function HomePage() {
         <div className="max-w-2xl mx-auto space-y-3">
           <SearchBar onSearch={handleSearch} loading={isLoading} />
           <FilterPanel filters={filters} onChange={setFilters} />
-        </div>
-
-        {/* Debug toggle */}
-        <div className="max-w-2xl mx-auto mt-3 flex justify-end">
           <button
             onClick={() => setDebugMode((v) => !v)}
-            className={`text-xs px-2 py-1 rounded border transition-colors ${
+            className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
               debugMode
-                ? 'bg-yellow-50 border-yellow-300 text-yellow-700'
-                : 'border-slate-200 text-slate-400 hover:text-slate-600'
+                ? 'bg-brand-50 border-brand-300 text-brand-700 font-medium'
+                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
             }`}
           >
-            {debugMode ? 'Skóre: zapnuto' : 'Skóre: vypnuto'}
+            {debugMode ? 'Skrýt skóre' : 'Zobrazit skóre'}
           </button>
         </div>
       </header>
@@ -216,11 +212,9 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Debug panel */}
-            {debugMode && isSuccess && (
-              <div className="mt-6">
-                <DebugPanel debug={{ rawListings: [], scoreBreakdowns: {}, dedupeGroups: {}, adapterLogs: {} as never }} />
-              </div>
+            {/* Methodology panel */}
+            {debugMode && (
+              <MethodologyPanel sortBy={filters.sortBy ?? 'best_deal'} />
             )}
           </>
         )}

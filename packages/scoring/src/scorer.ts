@@ -166,11 +166,17 @@ export function scoreListings(
       ? relevantPrices
       : listings.map((l) => l.price).filter((p): p is number => p !== null && p > 0);
 
-  return listings.map((listing, idx) => {
+  // Filter out listings with near-zero relevance — these are structurally
+  // unrelated results (e.g. Fler returning fashion items for "Skoda Octavia").
+  const RELEVANCE_GATE = 0.1;
+  const filteredListings = listings.filter((_, i) => relevanceScores[i] >= RELEVANCE_GATE);
+  const filteredRelevance = relevanceScores.filter((s) => s >= RELEVANCE_GATE);
+
+  return filteredListings.map((listing, idx) => {
     // Adjust weights for signals this source structurally cannot provide
     const w = getEffectiveWeights(listing, weights);
 
-    const relevance = relevanceScores[idx];
+    const relevance = filteredRelevance[idx];
     const valueForMoney = scoreValueForMoney(listing.price, validPrices);
     const condition     = scoreCondition(listing.condition);
     // Topped (promoted) listings are re-topped daily so postedAt always shows
