@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { SearchCoordinator } from '@sdf/core';
 import type { SourceAdapter } from '@sdf/types';
-import { BazosAdapter, SbazarAdapter, VintedAdapter, FacebookAdapter, AukroAdapter, MockAdapter } from '@sdf/source-adapters';
+import { BazosAdapter, SbazarAdapter, VintedAdapter, FacebookAdapter, AukroAdapter, FlerAdapter, MockAdapter } from '@sdf/source-adapters';
 
 const SearchSchema = z.object({
   query: z.string().min(1).max(200),
@@ -12,7 +12,7 @@ const SearchSchema = z.object({
     .string()
     .optional()
     .transform((v) =>
-      v ? (v.split(',') as ('bazos' | 'sbazar' | 'vinted' | 'facebook' | 'aukro' | 'mock')[]) : undefined,
+      v ? (v.split(',') as ('bazos' | 'sbazar' | 'vinted' | 'facebook' | 'aukro' | 'fler' | 'mock')[]) : undefined,
     ),
   sortBy: z
     .enum(['best_deal', 'newest', 'cheapest', 'safest', 'most_relevant'])
@@ -24,10 +24,11 @@ const SearchSchema = z.object({
 function buildAdapters(): SourceAdapter[] {
   if (process.env.USE_MOCK_ADAPTERS === 'true') return [new MockAdapter()];
   const adapters: SourceAdapter[] = [new BazosAdapter()];
-  if (process.env.ENABLE_SBAZAR === 'true') adapters.push(new SbazarAdapter());
-  if (process.env.ENABLE_VINTED === 'true') adapters.push(new VintedAdapter());
+  if (process.env.ENABLE_SBAZAR   === 'true') adapters.push(new SbazarAdapter());
+  if (process.env.ENABLE_VINTED   === 'true') adapters.push(new VintedAdapter());
   if (process.env.ENABLE_FACEBOOK === 'true') adapters.push(new FacebookAdapter());
-  if (process.env.ENABLE_AUKRO === 'true') adapters.push(new AukroAdapter());
+  if (process.env.ENABLE_AUKRO    === 'true') adapters.push(new AukroAdapter());
+  if (process.env.ENABLE_FLER     !== 'false') adapters.push(new FlerAdapter());
   return adapters;
 }
 

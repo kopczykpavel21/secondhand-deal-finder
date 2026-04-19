@@ -30,6 +30,11 @@ const SOURCE_META: Record<
     color: 'bg-rose-50 text-rose-700 border-rose-200',
     dot: 'bg-rose-500',
   },
+  fler: {
+    label: 'Fler',
+    color: 'bg-pink-50 text-pink-700 border-pink-200',
+    dot: 'bg-pink-500',
+  },
   mock: {
     label: 'Demo',
     color: 'bg-slate-100 text-slate-600 border-slate-200',

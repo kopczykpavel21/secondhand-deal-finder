@@ -15,6 +15,7 @@ const SOURCE_LABEL: Record<Source, string> = {
   sbazar:   'Sbazar',
   vinted:   'Vinted',
   aukro:    'Aukro',
+  fler:     'Fler',
   facebook: 'Facebook',
   mock:     'Demo',
 };

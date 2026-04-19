@@ -61,9 +61,13 @@ export default function HomePage() {
   // Unified data accessors — work for both 'loading' (partial) and 'success'
   const isLoading  = state.status === 'loading';
   const isSuccess  = state.status === 'success';
-  const allResults = (isLoading || isSuccess ? state.results : []).filter(
-    (r) => !dismissed.has(r.id),
-  );
+  const activeConditions = filters.conditions ?? [];
+  const locationQuery    = (filters.location ?? '').trim().toLowerCase();
+
+  const allResults = (isLoading || isSuccess ? state.results : [])
+    .filter((r) => !dismissed.has(r.id))
+    .filter((r) => activeConditions.length === 0 || activeConditions.includes(r.condition))
+    .filter((r) => !locationQuery || (r.location ?? '').toLowerCase().includes(locationQuery));
   const sources    = isLoading || isSuccess ? state.sources : [];
   const total      = isLoading || isSuccess ? state.total   : 0;
 
@@ -93,7 +97,7 @@ export default function HomePage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-brand-100 text-brand-700 text-xs font-semibold px-3 py-1 rounded-full mb-4">
             <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
-            Beta · Bazoš · Sbazar · Vinted · Aukro
+            Beta · Bazoš · Vinted · Aukro · Fler
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
             Secondhand Deal Finder
@@ -247,7 +251,7 @@ export default function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <p className="font-medium text-slate-400">Napište co hledáte</p>
-            <p className="text-sm text-slate-300">Prohledáme Bazoš, Sbazar, Vinted a Aukro najednou.</p>
+            <p className="text-sm text-slate-300">Prohledáme Bazoš, Vinted, Aukro a Fler najednou.</p>
           </div>
         )}
       </main>

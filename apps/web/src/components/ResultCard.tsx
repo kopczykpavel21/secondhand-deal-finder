@@ -115,6 +115,8 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
               src={listing.imageUrl}
               alt={listing.title}
               className="w-full h-full object-cover aspect-square"
+              loading="lazy"
+              decoding="async"
               onError={() => setImgError(true)}
             />
           ) : (
