@@ -24,7 +24,7 @@ const SearchSchema = z.object({
 function buildAdapters(): SourceAdapter[] {
   if (process.env.USE_MOCK_ADAPTERS === 'true') return [new MockAdapter()];
   const adapters: SourceAdapter[] = [new BazosAdapter()];
-  if (process.env.ENABLE_SBAZAR !== 'false') adapters.push(new SbazarAdapter());
+  if (process.env.ENABLE_SBAZAR === 'true') adapters.push(new SbazarAdapter());
   if (process.env.ENABLE_VINTED === 'true') adapters.push(new VintedAdapter());
   if (process.env.ENABLE_FACEBOOK === 'true') adapters.push(new FacebookAdapter());
   if (process.env.ENABLE_AUKRO === 'true') adapters.push(new AukroAdapter());
