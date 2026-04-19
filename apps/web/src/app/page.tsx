@@ -9,6 +9,7 @@ import { ResultCard } from '@/components/ResultCard';
 import { SourceStatusBar } from '@/components/SourceStatusBar';
 import { DebugPanel } from '@/components/DebugPanel';
 import { LoadingAnimation } from '@/components/LoadingAnimation';
+import { FeedbackModal } from '@/components/FeedbackModal';
 
 const PAGE_SIZE = 25;
 const FETCH_LIMIT = 50;
@@ -38,6 +39,7 @@ export default function HomePage() {
   const [debugMode, setDebugMode] = useState(false);
   const [page, setPage] = useState(0);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   // Load dismissed IDs from localStorage after mount (avoids SSR mismatch)
   useEffect(() => { setDismissed(loadDismissed()); }, []);
@@ -253,6 +255,18 @@ export default function HomePage() {
       <footer className="text-center text-xs text-slate-400 pb-8">
         Secondhand Deal Finder · MVP · Data ze třetích stran, pouze pro informaci
       </footer>
+
+      {/* Floating feedback button */}
+      <button
+        onClick={() => setFeedbackOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-full shadow-lg text-sm font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600 hover:shadow-xl transition-all"
+      >
+        <span className="text-base">💬</span>
+        Zpětná vazba
+      </button>
+
+      {/* Feedback modal */}
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }
