@@ -23,13 +23,12 @@ export function buildPolishAdapters(options: {
     return [new MockAdapter()];
   }
 
-  const adapters: SourceAdapter[] = [];
-  if (process.env.ENABLE_VINTED !== 'false') {
-    adapters.push(new VintedAdapter({
+  const adapters: SourceAdapter[] = [
+    new VintedAdapter({
       baseUrl: 'https://www.vinted.pl',
       marketConfig: getMarketConfig('pl'),
-    }));
-  }
+    }),
+  ];
   if (process.env.ENABLE_OLX !== 'false') adapters.push(new OlxAdapter());
   if (process.env.ENABLE_SPRZEDAJEMY !== 'false') adapters.push(new SprzedajemyAdapter());
 

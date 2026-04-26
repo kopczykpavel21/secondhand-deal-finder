@@ -41,9 +41,13 @@ function asString(value: unknown): string | null {
 
 function normalizeOlxUrl(value: string | null): string | null {
   if (!value) return null;
-  if (value.startsWith('//')) return `https:${value}`;
-  if (value.startsWith('/')) return `${BASE_URL}${value}`;
-  return value;
+  const normalized = decodeEntities(value)
+    .replace(/\\\//g, '/')
+    .replace(/^http:\/\//i, 'https://')
+    .trim();
+  if (normalized.startsWith('//')) return `https:${normalized}`;
+  if (normalized.startsWith('/')) return `${BASE_URL}${normalized}`;
+  return normalized;
 }
 
 function extractPrice(value: unknown): number | null {
@@ -162,8 +166,8 @@ export class OlxAdapter extends BaseAdapter {
     const seen = new Set<string>();
 
     for (const obj of extractStructuredObjects(html)) {
-      const rawUrl = asString(obj.url) ?? asString(obj.href) ?? asString(obj.link);
-      const title = asString(obj.name) ?? asString(obj.title);
+      const rawUrl = normalizeOlxUrl(asString(obj.url) ?? asString(obj.href) ?? asString(obj.link));
+      const title = decodeEntities(asString(obj.name) ?? asString(obj.title) ?? '');
       if (!rawUrl || !title || !rawUrl.includes('/d/oferta/')) continue;
 
       const listingId = this.extractListingId(rawUrl);
@@ -182,10 +186,12 @@ export class OlxAdapter extends BaseAdapter {
         firstImage(obj.photo) ??
         null;
 
-      const rawLocation =
+      const rawLocation = decodeEntities(
         asString((obj.address as Record<string, unknown> | undefined)?.addressLocality) ??
         asString(obj.location) ??
-        asString(obj.city);
+        asString(obj.city) ??
+        ''
+      ) || null;
 
       const conditionText =
         asString(obj.itemCondition) ??
@@ -200,7 +206,7 @@ export class OlxAdapter extends BaseAdapter {
         sourceListingId: listingId,
         url: rawUrl.startsWith('http') ? rawUrl : `${BASE_URL}${rawUrl}`,
         title,
-        description: asString(obj.description),
+        description: decodeEntities(asString(obj.description) ?? '') || null,
         price,
         currency: 'PLN',
         location: rawLocation,
