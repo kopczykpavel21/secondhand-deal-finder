@@ -90,17 +90,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Basic safety check — only allow known marketplace domains
-  const allowed = [
-    'vinted.pl',
-    'olx.pl',
-    'allegrolokalnie.pl',
-    'sprzedajemy.pl',
-    'bazos.cz',
-    'aukro.cz',
-    'vinted.cz',
-    'sbazar.cz',
-    'facebook.com',
-  ];
+  const allowed = ['bazos.cz', 'aukro.cz', 'vinted.cz', 'sbazar.cz', 'facebook.com'];
   const isAllowed = allowed.some((d) => url.includes(d));
   if (!isAllowed) {
     return NextResponse.json({ error: 'Domain not allowed' }, { status: 403 });

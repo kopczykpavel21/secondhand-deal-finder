@@ -1,8 +1,5 @@
-import { getMarketConfig, getSourceLabel } from '@sdf/types';
 import type { Source } from '@sdf/types';
 import clsx from 'clsx';
-
-const market = getMarketConfig('pl');
 
 const SOURCE_META: Record<
   Source,
@@ -48,21 +45,6 @@ const SOURCE_META: Record<
     color: 'bg-green-50 text-green-700 border-green-200',
     dot: 'bg-green-500',
   },
-  olx: {
-    label: 'OLX',
-    color: 'bg-violet-50 text-violet-700 border-violet-200',
-    dot: 'bg-violet-500',
-  },
-  allegro_lokalnie: {
-    label: 'Allegro Lokalnie',
-    color: 'bg-lime-50 text-lime-700 border-lime-200',
-    dot: 'bg-lime-500',
-  },
-  sprzedajemy: {
-    label: 'Sprzedajemy.pl',
-    color: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-    dot: 'bg-cyan-500',
-  },
   kleinanzeigen: {
     label: 'Kleinanzeigen',
     color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -72,6 +54,21 @@ const SOURCE_META: Record<
     label: 'Shpock',
     color: 'bg-red-50 text-red-700 border-red-200',
     dot: 'bg-red-500',
+  },
+  olx: {
+    label: 'OLX',
+    color: 'bg-violet-50 text-violet-700 border-violet-200',
+    dot: 'bg-violet-500',
+  },
+  allegro_lokalnie: {
+    label: 'Allegro',
+    color: 'bg-orange-50 text-orange-700 border-orange-200',
+    dot: 'bg-orange-500',
+  },
+  sprzedajemy: {
+    label: 'Sprzedajemy',
+    color: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+    dot: 'bg-cyan-500',
   },
 };
 
@@ -85,7 +82,7 @@ export function SourceBadge({ source }: { source: Source }) {
       )}
     >
       <span className={clsx('w-1.5 h-1.5 rounded-full', meta.dot)} />
-      {getSourceLabel(source, market) ?? meta.label}
+      {meta.label}
     </span>
   );
 }

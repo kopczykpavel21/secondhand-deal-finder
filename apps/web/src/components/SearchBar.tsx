@@ -5,17 +5,15 @@ import { useState, FormEvent, useEffect } from 'react';
 interface SearchBarProps {
   onSearch: (query: string) => void;
   loading?: boolean;
-  placeholder?: string;
-  suggestions?: string[];
 }
 
-const DEFAULT_SUGGESTIONS = [
+const SUGGESTIONS = [
   'iPhone 13 128GB',
-  'rower górski',
-  'kurtka zimowa',
+  'kolo horské',
+  'zimní bunda',
   'MacBook Pro',
   'PlayStation 5',
-  'wózek dziecięcy',
+  'dětský kočárek',
 ];
 
 const RECENT_KEY    = 'sdf-recent-searches';
@@ -44,12 +42,7 @@ function removeRecent(query: string) {
   } catch { /* ignore */ }
 }
 
-export function SearchBar({
-  onSearch,
-  loading,
-  placeholder = 'Czego szukasz? Np. iPhone 13, rower, kurtka zimowa...',
-  suggestions = DEFAULT_SUGGESTIONS,
-}: SearchBarProps) {
+export function SearchBar({ onSearch, loading }: SearchBarProps) {
   const [query, setQuery]       = useState('');
   const [recent, setRecent]     = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(false);
@@ -94,7 +87,7 @@ export function SearchBar({
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setShowRecent(true)}
             onBlur={() => setTimeout(() => setShowRecent(false), 150)}
-            placeholder={placeholder}
+            placeholder="Co hledáte? Např. iPhone 13, kolo, zimní bunda..."
             className="flex-1 px-4 py-4 text-base text-slate-900 placeholder-slate-400 bg-transparent outline-none"
             autoComplete="off"
             autoFocus
@@ -118,10 +111,10 @@ export function SearchBar({
             {loading ? (
               <span className="flex items-center gap-2">
                 <Spinner />
-                Szukam…
+                Hledám…
               </span>
             ) : (
-              'Szukaj'
+              'Hledat'
             )}
           </button>
         </div>
@@ -130,7 +123,7 @@ export function SearchBar({
         {showRecent && recent.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-30 overflow-hidden">
             <p className="px-4 pt-3 pb-1 text-xs font-semibold text-slate-400 uppercase tracking-wide">
-              Ostatnie wyszukiwania
+              Nedávná hledání
             </p>
             {recent.map((q) => (
               <div
@@ -172,7 +165,7 @@ export function SearchBar({
             {q}
           </button>
         ))}
-        {suggestions.filter((s) => !recent.some((r) => r.toLowerCase() === s.toLowerCase()))
+        {SUGGESTIONS.filter((s) => !recent.some((r) => r.toLowerCase() === s.toLowerCase()))
           .slice(0, Math.max(0, 6 - Math.min(recent.length, 4)))
           .map((s) => (
             <button

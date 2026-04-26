@@ -18,23 +18,23 @@ interface Factor {
 function getFactors(sortBy: SortOption): Factor[] {
   if (sortBy === 'most_relevant') {
     return [
-      { label: 'Dopasowanie do zapytania', pct: 70 },
-      { label: 'Stan produktu', pct: 9 },
-      { label: 'Świeżość ogłoszenia', pct: 7 },
-      { label: 'Wiarygodność sprzedającego', pct: 5 },
-      { label: 'Kompletność ogłoszenia', pct: 5 },
-      { label: 'Zainteresowanie kupujących', pct: 4 },
-      { label: 'Relacja ceny do podobnych ofert', pct: 0, ignored: true },
+      { label: 'Shoda s hledaným výrazem', pct: 70 },
+      { label: 'Stav zboží', pct: 9 },
+      { label: 'Čerstvost inzerátu', pct: 7 },
+      { label: 'Důvěryhodnost prodávajícího', pct: 5 },
+      { label: 'Kompletnost inzerátu', pct: 5 },
+      { label: 'Zájem kupujících', pct: 4 },
+      { label: 'Poměr ceny k ostatním', pct: 0, ignored: true },
     ];
   }
   return [
-    { label: 'Dopasowanie do zapytania', pct: 37 },
-    { label: 'Relacja ceny do podobnych ofert', pct: 19 },
-    { label: 'Stan produktu', pct: 11 },
-    { label: 'Zainteresowanie kupujących', pct: 11 },
-    { label: 'Świeżość ogłoszenia', pct: 7 },
-    { label: 'Wiarygodność sprzedającego', pct: 7 },
-    { label: 'Kompletność ogłoszenia', pct: 7 },
+    { label: 'Shoda s hledaným výrazem', pct: 37 },
+    { label: 'Poměr ceny k ostatním', pct: 19 },
+    { label: 'Stav zboží', pct: 11 },
+    { label: 'Zájem kupujících', pct: 11 },
+    { label: 'Čerstvost inzerátu', pct: 7 },
+    { label: 'Důvěryhodnost prodávajícího', pct: 7 },
+    { label: 'Kompletnost inzerátu', pct: 7 },
   ];
 }
 
@@ -46,29 +46,29 @@ interface SortMeta {
 
 const SORT_META: Record<SortOption, SortMeta> = {
   best_deal: {
-    headline: 'Najlepsza okazja',
-    note: 'Oferty są sortowane według najwyższego wyniku. Wynik 0–100 łączy trafność, cenę, stan i wiarygodność sprzedającego.',
+    headline: 'Nejlepší nabídka',
+    note: 'Inzeráty jsou seřazeny od nejvyššího skóre. Skóre 0–100 kombinuje relevanci, cenu, stav a důvěryhodnost prodávajícího.',
     orderByLabel: null,
   },
   most_relevant: {
-    headline: 'Najlepsze dopasowanie',
-    note: 'Cena nie jest brana pod uwagę. Wyniki są sortowane wyłącznie według dopasowania do zapytania.',
+    headline: 'Nejlepší shoda',
+    note: 'Cena se nebere v úvahu. Výsledky jsou seřazeny čistě podle shody s hledaným výrazem — bez ohledu na cenu.',
     orderByLabel: null,
   },
   newest: {
-    headline: 'Najnowsze',
-    note: 'Kolejność zależy od daty dodania ogłoszenia, nie od wyniku. Wynik nadal jest liczony i pokazywany na każdej karcie.',
-    orderByLabel: 'Data dodania (najnowsze u góry)',
+    headline: 'Nejnovější',
+    note: 'Pořadí určuje datum přidání inzerátu, ne skóre. Skóre se stále počítá a zobrazuje na každé kartičce.',
+    orderByLabel: 'Datum přidání (nejnovější nahoře)',
   },
   cheapest: {
-    headline: 'Najtańsze',
-    note: 'Kolejność zależy od ceny rosnąco. Oferty bez podanej ceny trafiają na koniec. Wynik nadal jest liczony.',
-    orderByLabel: 'Cena (najniższa u góry)',
+    headline: 'Nejlevnější',
+    note: 'Pořadí určuje cena od nejnižší. Inzeráty bez uvedené ceny jsou na konci. Skóre se stále počítá.',
+    orderByLabel: 'Cena (nejnižší nahoře)',
   },
   safest: {
-    headline: 'Najbardziej wiarygodne',
-    note: 'Kolejność zależy od oceny sprzedającego. Źródła bez danych o sprzedającym są wyświetlane niżej.',
-    orderByLabel: 'Ocena sprzedającego (najwyższa u góry)',
+    headline: 'Nejdůvěryhodnější',
+    note: 'Pořadí určuje hodnocení prodávajícího. Bazoš a Fler tato data neposkytují — jejich inzeráty se zobrazí na konci.',
+    orderByLabel: 'Hodnocení prodávajícího (nejvyšší nahoře)',
   },
 };
 
@@ -82,7 +82,7 @@ export function MethodologyPanel({ sortBy }: MethodologyPanelProps) {
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-slate-400 text-xs">Jak działa sortowanie:</span>
+          <span className="text-slate-400 text-xs">Jak funguje řazení:</span>
           <span className="font-semibold text-slate-800">{meta.headline}</span>
         </div>
         <p className="text-xs text-slate-500 leading-relaxed">{meta.note}</p>
@@ -99,7 +99,7 @@ export function MethodologyPanel({ sortBy }: MethodologyPanelProps) {
       {/* Weight bars */}
       <div className="px-5 py-4">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-          {scoreDrivesOrder ? 'Wagi wyniku' : 'Wagi wyniku (widoczne na karcie, ale nie decydują o kolejności)'}
+          {scoreDrivesOrder ? 'Váhy skóre' : 'Váhy skóre (zobrazeno na kartičce, neurčuje pořadí)'}
         </p>
         <div className="space-y-2">
           {factors.map((f) => (
@@ -120,7 +120,7 @@ export function MethodologyPanel({ sortBy }: MethodologyPanelProps) {
           ))}
         </div>
         <p className="mt-4 text-xs text-slate-400 leading-relaxed">
-          Kara: spam lub podejrzanie niska cena −40% · promowane ogłoszenie jest oceniane na podstawie treści, bez dodatkowej kary za promowanie.
+          Penalizace: spam nebo podezřele nízká cena −40 % · topovaný inzerát se hodnotí na základě obsahu (bez penalizace za topování).
         </p>
       </div>
     </div>

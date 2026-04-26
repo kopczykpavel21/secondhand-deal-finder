@@ -2,7 +2,6 @@ import { SearchCoordinator, type SearchCache } from '@sdf/core';
 import { getMarketConfig } from '@sdf/types';
 import type { SourceAdapter } from '@sdf/types';
 import {
-  AllegroLokalnieAdapter,
   KleinanzeigeAdapter,
   MockAdapter,
   OlxAdapter,
@@ -32,7 +31,6 @@ export function buildPolishAdapters(options: {
     }));
   }
   if (process.env.ENABLE_OLX !== 'false') adapters.push(new OlxAdapter());
-  if (process.env.ENABLE_ALLEGRO_LOKALNIE !== 'false') adapters.push(new AllegroLokalnieAdapter());
   if (process.env.ENABLE_SPRZEDAJEMY !== 'false') adapters.push(new SprzedajemyAdapter());
 
   if (!options.limiter) return adapters;

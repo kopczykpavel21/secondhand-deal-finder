@@ -1,16 +1,13 @@
 import type { Metadata, Viewport } from 'next';
-import { getMarketConfig } from '@sdf/types';
 import './globals.css';
 
-const market = getMarketConfig('pl');
-
 export const metadata: Metadata = {
-  title: market.texts.title,
-  description: market.texts.description,
+  title: 'Secondhand Deal Finder',
+  description: 'Najdeme nejlepší secondhand nabídky napříč Bazoš, Vinted, Aukro a Fler. Řazeno podle skutečné hodnoty.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    title: market.texts.appName,
+    title: 'Deal Finder',
     statusBarStyle: 'default',
   },
   icons: {
@@ -18,10 +15,10 @@ export const metadata: Metadata = {
     apple: '/icon.svg',
   },
   openGraph: {
-    title: market.texts.title,
-    description: market.texts.description,
+    title: 'Secondhand Deal Finder',
+    description: 'Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.',
     type: 'website',
-    locale: 'pl_PL',
+    locale: 'cs_CZ',
   },
 };
 
@@ -34,7 +31,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pl">
+    <html lang="cs">
       <body className="min-h-screen">{children}</body>
     </html>
   );

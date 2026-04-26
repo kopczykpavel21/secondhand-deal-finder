@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getMarketConfig } from '@sdf/types';
 import type { SearchFilters } from '@sdf/types';
 import { useSearch } from '@/hooks/useSearch';
 import { SearchBar } from '@/components/SearchBar';
@@ -16,7 +15,6 @@ const PAGE_SIZE = 25;
 const FETCH_LIMIT = 50;
 const DISMISSED_KEY = 'sdf-dismissed';
 const MAX_DISMISSED = 500;
-const market = getMarketConfig('pl');
 
 function loadDismissed(): Set<string> {
   if (typeof window === 'undefined') return new Set();
@@ -99,24 +97,19 @@ export default function HomePage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-brand-100 text-brand-700 text-xs font-semibold px-3 py-1 rounded-full mb-4">
             <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
-            {market.texts.heroBadge}
+            Beta · Bazoš · Vinted · Aukro · Fler
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
-            {market.texts.appName}
+            Secondhand Deal Finder
           </h1>
           <p className="mt-2 text-slate-500 text-base sm:text-lg max-w-md mx-auto">
-            {market.texts.tagline}
+            Najdeme nejlepší nabídky napříč bazary a seřadíme je podle skutečné hodnoty.
           </p>
         </div>
 
         {/* Search */}
         <div className="max-w-2xl mx-auto space-y-3">
-          <SearchBar
-            onSearch={handleSearch}
-            loading={isLoading}
-            placeholder={market.texts.searchPlaceholder}
-            suggestions={market.searchSuggestions}
-          />
+          <SearchBar onSearch={handleSearch} loading={isLoading} />
           <FilterPanel filters={filters} onChange={setFilters} />
           <button
             onClick={() => setDebugMode((v) => !v)}
@@ -126,7 +119,7 @@ export default function HomePage() {
                 : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
             }`}
           >
-            {debugMode ? 'Ukryj ocenę' : 'Pokaż ocenę'}
+            {debugMode ? 'Skrýt skóre' : 'Zobrazit skóre'}
           </button>
         </div>
       </header>
@@ -152,13 +145,13 @@ export default function HomePage() {
               <div className="flex items-center gap-2">
                 <div className="text-sm text-slate-500">
                   <span className="font-semibold text-slate-800">{pageStart + 1}–{pageStart + results.length}</span>
-                  {' '}z {total} wyników · „{currentQuery}"
+                  {' '}z {total} výsledků · „{currentQuery}"
                   {isSuccess && (
                     <span className="text-slate-400"> · {state.executionMs}ms</span>
                   )}
                   {marketMedian != null && (
                     <span className="ml-2 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                      Cena rynkowa ~{new Intl.NumberFormat(market.locale, { style: 'currency', currency: market.currency, maximumFractionDigits: 0 }).format(marketMedian)}
+                      Tržní cena ~{new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(marketMedian)}
                     </span>
                   )}
                 </div>
@@ -202,18 +195,18 @@ export default function HomePage() {
                     onClick={() => { setPage((p) => p - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600 transition-colors shadow-sm"
                   >
-                    ← Poprzednia
+                    ← Předchozí
                   </button>
                 )}
                 <span className="text-sm text-slate-400">
-                  strona {page + 1} z {Math.ceil(allResults.length / PAGE_SIZE)}
+                  strana {page + 1} z {Math.ceil(allResults.length / PAGE_SIZE)}
                 </span>
                 {hasNextPage && (
                   <button
                     onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600 transition-colors shadow-sm"
                   >
-                    Następna →
+                    Další →
                   </button>
                 )}
               </div>
@@ -229,7 +222,7 @@ export default function HomePage() {
         {/* Error */}
         {state.status === 'error' && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
-            <p className="font-semibold text-red-700">Wyszukiwanie nie powiodło się</p>
+            <p className="font-semibold text-red-700">Hledání selhalo</p>
             <p className="text-red-500 text-sm mt-1">{state.message}</p>
           </div>
         )}
@@ -240,8 +233,8 @@ export default function HomePage() {
             <svg className="w-12 h-12 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="font-semibold text-slate-700">{market.texts.noResultsTitle}</p>
-            <p className="text-slate-400 text-sm mt-1">{market.texts.noResultsBody}</p>
+            <p className="font-semibold text-slate-700">Žádné výsledky</p>
+            <p className="text-slate-400 text-sm mt-1">Zkuste jiné klíčové slovo nebo upravte filtry.</p>
           </div>
         )}
 
@@ -251,14 +244,14 @@ export default function HomePage() {
             <svg className="w-16 h-16 mx-auto text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <p className="font-medium text-slate-400">{market.texts.emptyStateTitle}</p>
-            <p className="text-sm text-slate-300">{market.texts.emptyStateBody}</p>
+            <p className="font-medium text-slate-400">Napište co hledáte</p>
+            <p className="text-sm text-slate-300">Prohledáme Bazoš, Vinted, Aukro a Fler najednou.</p>
           </div>
         )}
       </main>
 
       <footer className="text-center text-xs text-slate-400 pb-8">
-        {market.texts.footer}
+        Secondhand Deal Finder · MVP · Data ze třetích stran, pouze pro informaci
       </footer>
 
       {/* Floating feedback button */}
@@ -267,7 +260,7 @@ export default function HomePage() {
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-full shadow-lg text-sm font-medium text-slate-600 hover:border-brand-400 hover:text-brand-600 hover:shadow-xl transition-all"
       >
         <span className="text-base">💬</span>
-        {market.texts.feedbackButton}
+        Zpětná vazba
       </button>
 
       {/* Feedback modal */}

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { getMarketConfig } from '@sdf/types';
 import type { Condition, SearchFilters, Source, SortOption } from '@sdf/types';
 import clsx from 'clsx';
 
@@ -10,22 +9,27 @@ interface FilterPanelProps {
   onChange: (filters: SearchFilters) => void;
 }
 
-const SOURCES: { id: Source; label: string; badge: string }[] = getMarketConfig('pl').sourceOptions;
+const SOURCES: { id: Source; label: string; badge: string }[] = [
+  { id: 'bazos',  label: 'Bazoš',  badge: 'full' },
+  { id: 'vinted', label: 'Vinted', badge: 'partial' },
+  { id: 'aukro',  label: 'Aukro',  badge: 'partial' },
+  { id: 'fler',   label: 'Fler',   badge: 'partial' },
+];
 
 const SORT_OPTIONS: { id: SortOption; label: string; hint?: string }[] = [
-  { id: 'best_deal',     label: 'Najlepsza okazja' },
-  { id: 'most_relevant', label: 'Najlepsze dopasowanie', hint: 'Cena nie jest brana pod uwagę' },
-  { id: 'newest',        label: 'Najnowsze' },
-  { id: 'cheapest',      label: 'Najtańsze' },
-  { id: 'safest',        label: 'Najbardziej wiarygodne' },
+  { id: 'best_deal',     label: 'Nejlepší nabídka' },
+  { id: 'most_relevant', label: 'Nejlepší shoda', hint: 'Cena se nebere v úvahu' },
+  { id: 'newest',        label: 'Nejnovější' },
+  { id: 'cheapest',      label: 'Nejlevnější' },
+  { id: 'safest',        label: 'Nejdůvěryhodnější' },
 ];
 
 const CONDITIONS: { id: Condition; label: string; emoji: string }[] = [
-  { id: 'new',      label: 'Nowe',       emoji: '✨' },
-  { id: 'like_new', label: 'Jak nowe',   emoji: '⭐' },
-  { id: 'good',     label: 'Dobry stan', emoji: '👍' },
-  { id: 'fair',     label: 'Używane',    emoji: '🔧' },
-  { id: 'poor',     label: 'Uszkodzone', emoji: '⚠️' },
+  { id: 'new',      label: 'Nové',        emoji: '✨' },
+  { id: 'like_new', label: 'Jako nové',   emoji: '⭐' },
+  { id: 'good',     label: 'Dobrý stav',  emoji: '👍' },
+  { id: 'fair',     label: 'Opotřebené',  emoji: '🔧' },
+  { id: 'poor',     label: 'Poškozené',   emoji: '⚠️' },
 ];
 
 const BADGE_STYLE: Record<string, string> = {
@@ -69,7 +73,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
         </svg>
-        Filtry i sortowanie
+        Filtry a řazení
         {hasActiveFilters && (
           <span className="w-2 h-2 bg-brand-500 rounded-full" />
         )}
@@ -88,7 +92,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
           {/* Price range */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Cena (PLN)
+              Cena (CZK)
             </label>
             <div className="flex gap-2 items-center">
               <input
@@ -118,7 +122,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
           {/* Location */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Lokalizacja
+              Lokalita
             </label>
             <div className="relative">
               <svg
@@ -130,7 +134,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
               </svg>
               <input
                 type="text"
-                placeholder="Miasto lub region, np. Warszawa"
+                placeholder="Město nebo kraj, např. Praha"
                 value={filters.location ?? ''}
                 onChange={(e) =>
                   onChange({ ...filters, location: e.target.value || undefined })
@@ -138,13 +142,13 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
                 className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
-            <p className="text-xs text-slate-400 mt-1">Filtruje wyniki po miejscu wystawienia oferty</p>
+            <p className="text-xs text-slate-400 mt-1">Filtruje výsledky podle místa inzerátu</p>
           </div>
 
           {/* Condition */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Stan
+              Stav zboží
             </label>
             <div className="flex flex-wrap gap-2">
               {CONDITIONS.map((c) => {
@@ -167,14 +171,14 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
               })}
             </div>
             {activeConditions.length === 0 && (
-              <p className="text-xs text-slate-400 mt-1">Brak wyboru = pokaż wszystko</p>
+              <p className="text-xs text-slate-400 mt-1">Žádný výběr = zobrazit vše</p>
             )}
           </div>
 
           {/* Sort by */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Sortuj według
+              Řadit podle
             </label>
             <div className="flex flex-wrap gap-2">
               {SORT_OPTIONS.map((opt) => {
@@ -206,7 +210,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
           {/* Sources */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Źródła
+              Zdroje
             </label>
             <div className="flex flex-wrap gap-2">
               {SOURCES.map((src) => {
@@ -241,7 +245,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              Wyczyść filtry
+              Zrušit filtry
             </button>
           )}
         </div>

@@ -14,13 +14,13 @@ interface Summary {
 }
 
 const IMPROVEMENT_LABEL: Record<string, string> = {
-  more_sources:   'Więcej źródeł',
-  price_alerts:   'Alerty cenowe',
-  better_filters: 'Lepsze filtry',
-  mobile_app:     'Aplikacja mobilna',
-  faster:         'Szybsze ładowanie',
-  saved_searches: 'Zapisane wyszukiwania',
-  other:          'Coś innego',
+  more_sources:   'Více zdrojů',
+  price_alerts:   'Cenová upozornění',
+  better_filters: 'Lepší filtry',
+  mobile_app:     'Mobilní aplikace',
+  faster:         'Rychlejší načítání',
+  saved_searches: 'Uložená hledání',
+  other:          'Jiné',
 };
 
 function Stars({ rating }: { rating: number }) {
@@ -54,22 +54,22 @@ export default function FeedbackAdminPage() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Opinie użytkowników</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Zpětná vazba</h1>
             <p className="text-slate-500 text-sm mt-0.5">
-              Odpowiedzi są trzymane w pamięci aplikacji. Po restarcie znikną, ale pozostają w logach Railway.
+              Odpovědi jsou uloženy v paměti — při restartu aplikace se vymažou, ale zůstávají v Railway logách.
             </p>
           </div>
           <button
             onClick={load}
             className="px-4 py-2 text-sm bg-white border border-slate-200 rounded-xl hover:border-slate-300 transition-colors shadow-sm"
           >
-            Odśwież
+            Obnovit
           </button>
         </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm mb-6">
-            Nie udało się wczytać danych.
+            Načtení selhalo.
           </div>
         )}
 
@@ -78,11 +78,11 @@ export default function FeedbackAdminPage() {
             {/* Summary cards */}
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p className="text-sm text-slate-500 mb-1">Liczba odpowiedzi</p>
+                <p className="text-sm text-slate-500 mb-1">Celkem odpovědí</p>
                 <p className="text-3xl font-bold text-slate-900">{data.total}</p>
               </div>
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <p className="text-sm text-slate-500 mb-1">Średnia ocena</p>
+                <p className="text-sm text-slate-500 mb-1">Průměrné hodnocení</p>
                 <p className="text-3xl font-bold text-slate-900">
                   {data.averageRating ?? '—'}
                   {data.averageRating && <span className="text-xl text-yellow-400 ml-1">★</span>}
@@ -102,7 +102,7 @@ export default function FeedbackAdminPage() {
               if (sorted.length === 0) return null;
               return (
                 <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm mb-6">
-                  <h2 className="text-sm font-semibold text-slate-700 mb-3">Najczęściej wskazywane usprawnienia</h2>
+                  <h2 className="text-sm font-semibold text-slate-700 mb-3">Nejžádanější vylepšení</h2>
                   <div className="space-y-2">
                     {sorted.map(([id, count]) => (
                       <div key={id} className="flex items-center gap-3">
@@ -124,17 +124,17 @@ export default function FeedbackAdminPage() {
             {/* Individual responses */}
             {data.total === 0 ? (
               <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-slate-400">
-                Na razie brak odpowiedzi.
+                Zatím žádné odpovědi.
               </div>
             ) : (
               <div className="space-y-3">
-                <h2 className="text-sm font-semibold text-slate-700">Wszystkie odpowiedzi</h2>
+                <h2 className="text-sm font-semibold text-slate-700">Všechny odpovědi</h2>
                 {data.responses.map((r) => (
                   <div key={r.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <Stars rating={r.rating} />
                       <span className="text-xs text-slate-400 whitespace-nowrap">
-                        {new Date(r.submittedAt).toLocaleString('pl-PL')}
+                        {new Date(r.submittedAt).toLocaleString('cs-CZ')}
                       </span>
                     </div>
 

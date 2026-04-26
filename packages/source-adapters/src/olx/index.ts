@@ -39,6 +39,13 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
+function normalizeOlxUrl(value: string | null): string | null {
+  if (!value) return null;
+  if (value.startsWith('//')) return `https:${value}`;
+  if (value.startsWith('/')) return `${BASE_URL}${value}`;
+  return value;
+}
+
 function extractPrice(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value !== 'string') return null;
@@ -48,7 +55,7 @@ function extractPrice(value: unknown): number | null {
 }
 
 function firstImage(value: unknown): string | null {
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') return normalizeOlxUrl(value);
   if (Array.isArray(value)) {
     for (const item of value) {
       const found = firstImage(item);
@@ -58,7 +65,7 @@ function firstImage(value: unknown): string | null {
   }
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
-  return (
+  return normalizeOlxUrl(
     asString(record.url) ??
     asString(record.src) ??
     asString(record.imageUrl) ??
@@ -242,10 +249,11 @@ export class OlxAdapter extends BaseAdapter {
       const metaLine = stripTags(block);
       const locationDate = metaLine.match(/([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]+)\s*-\s*([^|]+)/);
       const conditionText = this.extractConditionFromText(metaLine);
-      const imageUrl =
+      const imageUrl = normalizeOlxUrl(
         block.match(/<img[^>]+src="([^"]+)"/i)?.[1] ??
         block.match(/<img[^>]+srcset="([^"\s,]+)[^"]*"/i)?.[1] ??
-        null;
+        null
+      );
 
       results.push({
         id: this.makeId(listingId),

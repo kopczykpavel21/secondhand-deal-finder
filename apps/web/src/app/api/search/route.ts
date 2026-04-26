@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { SearchCoordinator } from '@sdf/core';
-import { getMarketConfig } from '@sdf/types';
-import type { Source } from '@sdf/types';
-import {
-  MockAdapter,
-  VintedAdapter,
-  OlxAdapter,
-  AllegroLokalnieAdapter,
-  SprzedajemyAdapter,
-} from '@sdf/source-adapters';
+import { MockAdapter } from '@sdf/source-adapters';
+import { BazosAdapter } from '@sdf/source-adapters';
+import { SbazarAdapter } from '@sdf/source-adapters';
+import { VintedAdapter } from '@sdf/source-adapters';
+import { FacebookAdapter } from '@sdf/source-adapters';
+import { AukroAdapter } from '@sdf/source-adapters';
 
 // ─── Request schema ───────────────────────────────────────────────────────────
 
@@ -23,7 +20,7 @@ const SearchSchema = z.object({
     .string()
     .optional()
     .transform((v) =>
-      v ? (v.split(',') as Source[]) : undefined,
+      v ? (v.split(',') as ('bazos' | 'sbazar' | 'vinted' | 'facebook' | 'aukro' | 'mock')[]) : undefined,
     ),
   sortBy: z
     .enum(['best_deal', 'newest', 'cheapest', 'safest', 'most_relevant'])
@@ -45,26 +42,34 @@ function buildAdapters() {
   }
 
   const adapters = [];
-  if (process.env.ENABLE_VINTED !== 'false') {
-    adapters.push(new VintedAdapter({
-      baseUrl: 'https://www.vinted.pl',
-      marketConfig: getMarketConfig('pl'),
-    }));
+
+  // Always try Bazoš (most reliable)
+  adapters.push(new BazosAdapter());
+
+  // Sbazar — partial support
+  if (process.env.ENABLE_SBAZAR !== 'false') {
+    adapters.push(new SbazarAdapter());
   }
-  if (process.env.ENABLE_OLX !== 'false') {
-    adapters.push(new OlxAdapter());
+
+  // Vinted — experimental
+  if (process.env.ENABLE_VINTED === 'true') {
+    adapters.push(new VintedAdapter());
   }
-  if (process.env.ENABLE_ALLEGRO_LOKALNIE !== 'false') {
-    adapters.push(new AllegroLokalnieAdapter());
+
+  // Facebook — experimental (likely returns 0 results without auth)
+  if (process.env.ENABLE_FACEBOOK === 'true') {
+    adapters.push(new FacebookAdapter());
   }
-  if (process.env.ENABLE_SPRZEDAJEMY !== 'false') {
-    adapters.push(new SprzedajemyAdapter());
+
+  // Aukro — experimental, buy-now listings only; first source with seller ratings
+  if (process.env.ENABLE_AUKRO === 'true') {
+    adapters.push(new AukroAdapter());
   }
 
   return adapters;
 }
 
-const coordinator = new SearchCoordinator(buildAdapters(), getMarketConfig('pl'));
+const coordinator = new SearchCoordinator(buildAdapters());
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 
@@ -74,7 +79,7 @@ export async function GET(req: NextRequest) {
 
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Nieprawidłowe żądanie', issues: parsed.error.flatten() },
+      { error: 'Invalid request', issues: parsed.error.flatten() },
       { status: 400 },
     );
   }
@@ -97,6 +102,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error('[api/search] Unhandled error:', err);
-    return NextResponse.json({ error: 'Wyszukiwanie nie powiodło się' }, { status: 500 });
+    return NextResponse.json({ error: 'Search failed' }, { status: 500 });
   }
 }

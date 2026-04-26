@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getMarketConfig, getSourceLabel } from '@sdf/types';
 import type { Source, SourceStatus } from '@sdf/types';
 
 interface LoadingAnimationProps {
@@ -11,8 +10,23 @@ interface LoadingAnimationProps {
   completedStatuses: SourceStatus[];
 }
 
-const market = getMarketConfig('pl');
-const SCORING_STEPS = ['Porównuję ceny…', 'Obliczam ocenę…', 'Sortuję oferty…'];
+const SOURCE_LABEL: Record<Source, string> = {
+  bazos:            'Bazoš',
+  sbazar:           'Sbazar',
+  vinted:           'Vinted',
+  aukro:            'Aukro',
+  fler:             'Fler',
+  facebook:         'Facebook',
+  mock:             'Demo',
+  willhaben:        'willhaben',
+  kleinanzeigen:    'Kleinanzeigen',
+  shpock:           'Shpock',
+  olx:              'OLX',
+  allegro_lokalnie: 'Allegro',
+  sprzedajemy:      'Sprzedajemy',
+};
+
+const SCORING_STEPS = ['Porovnávám ceny…', 'Přiřazuji skóre…', 'Seřazuji nabídky…'];
 
 export function LoadingAnimation({
   completedSources,
@@ -35,8 +49,8 @@ export function LoadingAnimation({
   const statusText = allDone
     ? SCORING_STEPS[scoringStep]
     : activeSource
-    ? `Przeszukuję ${getSourceLabel(activeSource, market)}…`
-    : 'Przygotowuję wyszukiwanie…';
+    ? `Prohledávám ${SOURCE_LABEL[activeSource] ?? activeSource}…`
+    : 'Připravuji vyhledávání…';
 
   return (
     <div className="flex flex-col items-center gap-5 py-10">
@@ -61,7 +75,7 @@ export function LoadingAnimation({
                   : 'bg-red-50 text-red-600 border-red-200'
               }`}
             >
-              {s.success ? '✓' : '✗'} {getSourceLabel(s.source, market)}
+              {s.success ? '✓' : '✗'} {SOURCE_LABEL[s.source] ?? s.source}
               <span className="text-slate-400">{s.listingsFound}</span>
             </span>
           ))}
@@ -72,7 +86,7 @@ export function LoadingAnimation({
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border bg-slate-50 text-slate-400 border-slate-200"
             >
               <span className="w-3 h-3 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin inline-block" />
-              szukam…
+              hledám…
             </span>
           ))}
         </div>

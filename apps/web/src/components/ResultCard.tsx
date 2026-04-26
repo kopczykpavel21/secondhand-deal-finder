@@ -14,8 +14,8 @@ interface ResultCardProps {
 }
 
 function formatPrice(price: number | null, currency: string): string {
-  if (price === null) return 'Brak ceny';
-  return new Intl.NumberFormat('pl-PL', {
+  if (price === null) return 'Cena neuvedena';
+  return new Intl.NumberFormat('cs-CZ', {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
@@ -27,20 +27,20 @@ function formatDate(date: Date | string | null): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   const diff = Date.now() - d.getTime();
   const hours = diff / 3_600_000;
-  if (hours < 1) return 'Dodano przed chwilą';
-  if (hours < 24) return `${Math.floor(hours)} godz. temu`;
+  if (hours < 1) return 'Právě přidáno';
+  if (hours < 24) return `Před ${Math.floor(hours)} hod.`;
   const days = Math.floor(hours / 24);
-  if (days === 1) return 'Wczoraj';
-  if (days < 7) return `${days} dni temu`;
-  return d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' });
+  if (days === 1) return 'Včera';
+  if (days < 7) return `Před ${days} dny`;
+  return d.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' });
 }
 
 const CONDITION_LABEL: Record<string, string> = {
-  new: 'Nowe',
-  like_new: 'Jak nowe',
-  good: 'Dobry stan',
-  fair: 'Używane',
-  poor: 'Uszkodzone',
+  new: 'Nové',
+  like_new: 'Jako nové',
+  good: 'Dobrý stav',
+  fair: 'Opotřebované',
+  poor: 'Poškozené',
   unknown: '',
 };
 
@@ -87,7 +87,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
       {onDismiss && (
         <button
           onClick={onDismiss}
-          title="Ukryj tę ofertę"
+          title="Skrýt tento inzerát"
           className="absolute top-2 right-2 z-10 w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,7 +102,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
           <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          Prawdopodobnie sprzedane — oferta ma ponad 3 tygodnie
+          Pravděpodobně prodáno — inzerát je starší než 3 týdny
         </div>
       )}
 
@@ -134,7 +134,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
 
           {listing.promoted && (
             <div className="absolute bottom-0 left-0 right-0 bg-amber-400 text-amber-900 text-center text-xs font-semibold py-0.5">
-              Promowane
+              Topovaný
             </div>
           )}
         </div>
@@ -160,7 +160,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
-                    Wysyłka
+                    Doprava
                   </span>
                 )}
               </div>
@@ -185,14 +185,14 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
                   {lazyDesc}
                 </p>
               ) : descState === 'unavailable' ? (
-                <p className="mt-1 text-xs text-slate-400 italic">Opis jest niedostępny.</p>
+                <p className="mt-1 text-xs text-slate-400 italic">Popis není k dispozici.</p>
               ) : descState === 'loading' ? (
                 <p className="mt-1 text-xs text-slate-400 flex items-center gap-1">
                   <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
-                  Ładuję opis…
+                  Načítám popis…
                 </p>
               ) : (
                 <button
@@ -202,7 +202,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  Pokaż opis
+                  Zobrazit popis
                 </button>
               )}
 
@@ -247,7 +247,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Dlaczego taka ocena?
+              Proč toto hodnocení?
             </button>
             <a
               href={listing.url}
@@ -256,7 +256,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
               referrerPolicy="no-referrer"
               className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1 ml-auto"
             >
-              Otwórz ofertę
+              Zobrazit inzerát
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
@@ -280,7 +280,7 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
                 onClick={() => setShowDebug((v) => !v)}
                 className="text-xs text-slate-400 hover:text-slate-600"
               >
-                {showDebug ? 'Ukryj szczegóły oceny' : 'Szczegóły oceny'}
+                {showDebug ? 'Skrýt detail skóre' : 'Detail skóre'}
               </button>
               {showDebug && (
                 <div className="mt-2 p-3 bg-slate-50 rounded-xl text-xs font-mono space-y-1 border border-slate-200">
@@ -301,15 +301,15 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
 
 function ScoreBreakdown({ components }: { components: ScoredListing['scoreComponents'] }) {
   const rows: Array<[string, number]> = [
-    ['Dopasowanie', components.relevance],
-    ['Wartość względem ceny', components.valueForMoney],
-    ['Stan', components.condition],
-    ['Świeżość', components.freshness],
-    ['Kompletność oferty', components.completeness],
-    ['Wiarygodność sprzedawcy', components.sellerTrust],
-    ['Zainteresowanie kupujących', components.engagement],
-    ['Kara: promowanie', components.promotedPenalty],
-    ['Kara: spam', components.spamPenalty],
+    ['Relevance (shoda)', components.relevance],
+    ['Hodnota za cenu', components.valueForMoney],
+    ['Stav zboží', components.condition],
+    ['Čerstvost', components.freshness],
+    ['Úplnost inzerátu', components.completeness],
+    ['Důvěryhodnost prodejce', components.sellerTrust],
+    ['Zájem kupujících', components.engagement],
+    ['Penalizace: topování', components.promotedPenalty],
+    ['Penalizace: spam', components.spamPenalty],
   ];
   return (
     <>

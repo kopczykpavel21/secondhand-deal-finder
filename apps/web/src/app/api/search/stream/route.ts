@@ -1,15 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { SearchCoordinator } from '@sdf/core';
-import { getMarketConfig } from '@sdf/types';
-import type { Source, SourceAdapter } from '@sdf/types';
-import {
-  VintedAdapter,
-  MockAdapter,
-  OlxAdapter,
-  AllegroLokalnieAdapter,
-  SprzedajemyAdapter,
-} from '@sdf/source-adapters';
+import type { SourceAdapter } from '@sdf/types';
+import { BazosAdapter, SbazarAdapter, VintedAdapter, FacebookAdapter, AukroAdapter, FlerAdapter, MockAdapter } from '@sdf/source-adapters';
 
 const SearchSchema = z.object({
   query: z.string().min(1).max(200),
@@ -19,7 +12,7 @@ const SearchSchema = z.object({
     .string()
     .optional()
     .transform((v) =>
-      v ? (v.split(',') as Source[]) : undefined,
+      v ? (v.split(',') as ('bazos' | 'sbazar' | 'vinted' | 'facebook' | 'aukro' | 'fler' | 'mock')[]) : undefined,
     ),
   sortBy: z
     .enum(['best_deal', 'newest', 'cheapest', 'safest', 'most_relevant'])
@@ -30,20 +23,16 @@ const SearchSchema = z.object({
 
 function buildAdapters(): SourceAdapter[] {
   if (process.env.USE_MOCK_ADAPTERS === 'true') return [new MockAdapter()];
-  const adapters: SourceAdapter[] = [];
-  if (process.env.ENABLE_VINTED !== 'false') {
-    adapters.push(new VintedAdapter({
-      baseUrl: 'https://www.vinted.pl',
-      marketConfig: getMarketConfig('pl'),
-    }));
-  }
-  if (process.env.ENABLE_OLX !== 'false') adapters.push(new OlxAdapter());
-  if (process.env.ENABLE_ALLEGRO_LOKALNIE !== 'false') adapters.push(new AllegroLokalnieAdapter());
-  if (process.env.ENABLE_SPRZEDAJEMY !== 'false') adapters.push(new SprzedajemyAdapter());
+  const adapters: SourceAdapter[] = [new BazosAdapter()];
+  if (process.env.ENABLE_SBAZAR   === 'true') adapters.push(new SbazarAdapter());
+  if (process.env.ENABLE_VINTED   === 'true') adapters.push(new VintedAdapter());
+  if (process.env.ENABLE_FACEBOOK === 'true') adapters.push(new FacebookAdapter());
+  if (process.env.ENABLE_AUKRO    === 'true') adapters.push(new AukroAdapter());
+  if (process.env.ENABLE_FLER     !== 'false') adapters.push(new FlerAdapter());
   return adapters;
 }
 
-const coordinator = new SearchCoordinator(buildAdapters(), getMarketConfig('pl'));
+const coordinator = new SearchCoordinator(buildAdapters());
 const encoder = new TextEncoder();
 
 function sseChunk(data: object): Uint8Array {
@@ -55,7 +44,7 @@ export async function GET(req: NextRequest) {
   const parsed = SearchSchema.safeParse(params);
 
   if (!parsed.success) {
-    return new Response(JSON.stringify({ error: 'Nieprawidłowe żądanie' }), { status: 400 });
+    return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400 });
   }
 
   const { query, priceMin, priceMax, sources, sortBy, limit } = parsed.data;

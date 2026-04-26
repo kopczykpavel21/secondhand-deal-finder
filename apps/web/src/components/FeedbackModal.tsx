@@ -7,13 +7,13 @@ interface FeedbackModalProps {
 }
 
 const IMPROVEMENTS = [
-  { id: 'more_sources',   label: 'Więcej źródeł (np. Facebook Marketplace)' },
-  { id: 'price_alerts',   label: 'Alerty cenowe na e-mail' },
-  { id: 'better_filters', label: 'Lepsze filtry (stan, lokalizacja...)' },
-  { id: 'mobile_app',     label: 'Aplikacja mobilna' },
-  { id: 'faster',         label: 'Szybsze ładowanie wyników' },
-  { id: 'saved_searches', label: 'Zapisane wyszukiwania' },
-  { id: 'other',          label: 'Coś innego (napisz poniżej)' },
+  { id: 'more_sources',   label: 'Více zdrojů (Facebook, Letgo…)' },
+  { id: 'price_alerts',   label: 'Cenová upozornění na e-mail' },
+  { id: 'better_filters', label: 'Lepší filtry (stav, lokalita…)' },
+  { id: 'mobile_app',     label: 'Mobilní aplikace' },
+  { id: 'faster',         label: 'Rychlejší načítání výsledků' },
+  { id: 'saved_searches', label: 'Uložená hledání' },
+  { id: 'other',          label: 'Jiné (napište níže)' },
 ];
 
 export function FeedbackModal({ onClose }: FeedbackModalProps) {
@@ -67,8 +67,8 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Opinie</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Pomóż nam ulepszyć aplikację</p>
+            <h2 className="text-lg font-bold text-slate-900">Zpětná vazba</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Pomožte nám zlepšit aplikaci</p>
           </div>
           <button
             onClick={onClose}
@@ -82,13 +82,13 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
           /* Success state */
           <div className="px-6 py-12 text-center">
             <div className="text-5xl mb-4">🙌</div>
-            <h3 className="text-lg font-bold text-slate-900">Dzięki za opinię!</h3>
-            <p className="text-slate-500 text-sm mt-1 mb-6">Twoje odpowiedzi bardzo nam pomagają.</p>
+            <h3 className="text-lg font-bold text-slate-900">Díky za zpětnou vazbu!</h3>
+            <p className="text-slate-500 text-sm mt-1 mb-6">Vaše odpovědi nám hodně pomohou.</p>
             <button
               onClick={onClose}
               className="px-6 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors"
             >
-              Zamknij
+              Zavřít
             </button>
           </div>
         ) : (
@@ -97,7 +97,7 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
             {/* Q1 – Star rating */}
             <div>
               <p className="text-sm font-semibold text-slate-800 mb-3">
-                Jak oceniasz aplikację? <span className="text-red-400">*</span>
+                Jak jste spokojeni s aplikací? <span className="text-red-400">*</span>
               </p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -118,7 +118,7 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
                 ))}
                 {rating && (
                   <span className="ml-2 self-center text-sm text-slate-500">
-                    {['', 'Bardzo źle', 'Słabo', 'Średnio', 'Dobrze', 'Świetnie'][rating]}
+                    {['', 'Velmi špatně', 'Špatně', 'Průměrně', 'Dobře', 'Výborně'][rating]}
                   </span>
                 )}
               </div>
@@ -127,8 +127,8 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
             {/* Q2 – What to improve */}
             <div>
               <p className="text-sm font-semibold text-slate-800 mb-3">
-                Co chcesz dodać albo poprawić?
-                <span className="text-slate-400 font-normal"> (zaznacz wszystko, co pasuje)</span>
+                Co byste chtěli přidat nebo zlepšit?
+                <span className="text-slate-400 font-normal"> (vyberte vše, co platí)</span>
               </p>
               <div className="space-y-2">
                 {IMPROVEMENTS.map(({ id, label }) => (
@@ -166,13 +166,13 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
             {/* Q3 – Free text */}
             <div>
               <label className="block text-sm font-semibold text-slate-800 mb-2">
-                Dodatkowy komentarz
+                Libovolný komentář
               </label>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 rows={3}
-                placeholder="Czego Ci brakuje, co działa dobrze, co warto zmienić..."
+                placeholder="Co vám chybí, co se vám líbí, co byste změnili…"
                 className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent placeholder:text-slate-400"
               />
             </div>
@@ -180,19 +180,19 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
             {/* Q4 – Email (optional) */}
             <div>
               <label className="block text-sm font-semibold text-slate-800 mb-2">
-                E-mail <span className="text-slate-400 font-normal">(opcjonalnie, jeśli mamy odpisać)</span>
+                E-mail <span className="text-slate-400 font-normal">(nepovinný — pro zpětnou odpověď)</span>
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="twoj@email.pl"
+                placeholder="vas@email.cz"
                 className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent placeholder:text-slate-400"
               />
             </div>
 
             {status === 'error' && (
-              <p className="text-sm text-red-500">Nie udało się wysłać formularza. Spróbuj ponownie.</p>
+              <p className="text-sm text-red-500">Odeslání selhalo, zkuste to znovu.</p>
             )}
 
             {/* Actions */}
@@ -202,14 +202,14 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
                 onClick={onClose}
                 className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
               >
-                Anuluj
+                Zrušit
               </button>
               <button
                 type="submit"
                 disabled={!rating || status === 'sending'}
                 className="px-6 py-2.5 bg-brand-600 text-white text-sm font-semibold rounded-xl hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
               >
-                {status === 'sending' ? 'Wysyłam...' : 'Wyślij opinię'}
+                {status === 'sending' ? 'Odesílám…' : 'Odeslat zpětnou vazbu'}
               </button>
             </div>
           </form>

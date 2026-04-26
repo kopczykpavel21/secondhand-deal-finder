@@ -127,7 +127,28 @@ export async function GET(req: NextRequest) {
 
   const job = await enqueueSearchJob('pl', searchRequest);
   if (!job) {
-    return new Response(JSON.stringify({ error: 'Worker queue unavailable' }), { status: 503 });
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of inlineCoordinator.searchStream(searchRequest)) {
+            controller.enqueue(sseChunk(event));
+          }
+        } catch (err) {
+          controller.enqueue(sseChunk({ type: 'error', message: (err as Error).message }));
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      },
+    });
   }
 
   const stream = new ReadableStream({

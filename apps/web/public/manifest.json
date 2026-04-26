@@ -1,14 +1,14 @@
 {
-  "name": "Secondhand Okazje",
-  "short_name": "Okazje",
-  "description": "Porównujemy oferty z OLX, Allegro Lokalnie i Vinted.",
+  "name": "Secondhand Deal Finder",
+  "short_name": "Deal Finder",
+  "description": "Najdeme nejlepší nabídky napříč bazary – Bazoš, Vinted, Aukro, Fler.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#f1f5f9",
   "theme_color": "#0284c7",
   "categories": ["shopping", "utilities"],
-  "lang": "pl",
+  "lang": "cs",
   "icons": [
     {
       "src": "/icon.svg",
@@ -20,15 +20,15 @@
   "screenshots": [],
   "shortcuts": [
     {
-      "name": "Szukaj iPhone'a",
+      "name": "Hledat iPhone",
       "short_name": "iPhone",
       "url": "/?q=iPhone+13",
       "icons": [{ "src": "/icon.svg", "sizes": "any" }]
     },
     {
-      "name": "Szukaj roweru",
-      "short_name": "Rower",
-      "url": "/?q=rower+g%C3%B3rski",
+      "name": "Hledat kolo",
+      "short_name": "Kolo",
+      "url": "/?q=kolo+horsk%C3%A9",
       "icons": [{ "src": "/icon.svg", "sizes": "any" }]
     }
   ]
