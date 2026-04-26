@@ -10,6 +10,15 @@ export interface FeedbackEntry {
   email: string | null;
 }
 
+interface FeedbackRow {
+  id: string;
+  submitted_at: string;
+  rating: number;
+  improvements: string[];
+  comment: string | null;
+  email: string | null;
+}
+
 const memoryFeedback: FeedbackEntry[] = [];
 let feedbackTableReady = false;
 
@@ -86,20 +95,13 @@ export async function listFeedbackEntries(): Promise<FeedbackEntry[]> {
     return [...memoryFeedback].sort((left, right) => right.submittedAt.localeCompare(left.submittedAt));
   }
 
-  const result = await pool.query<{
-    id: string;
-    submitted_at: string;
-    rating: number;
-    improvements: string[];
-    comment: string | null;
-    email: string | null;
-  }>(`
+  const result = await pool.query<FeedbackRow>(`
     SELECT id, submitted_at, rating, improvements, comment, email
     FROM feedback_entries
     ORDER BY submitted_at DESC
   `);
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: FeedbackRow) => ({
     id: row.id,
     submittedAt: new Date(row.submitted_at).toISOString(),
     rating: row.rating,
