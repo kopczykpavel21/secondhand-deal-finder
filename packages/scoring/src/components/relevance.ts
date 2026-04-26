@@ -56,7 +56,7 @@ function normalizeInput(s: string): string {
 //      Query tokens dominate the title's opening section, an accessory noun
 //      appears after the last product-token match.
 
-const ACCESSORY_HEAD_NOUNS = new Set([
+const DEFAULT_ACCESSORY_HEAD_NOUNS = [
   // ── Czech: cases & covers ────────────────────────────────────────────────
   'kryt', 'krytu', 'kryty', 'krytem',
   'pouzdro', 'pouzdra', 'pouzdru', 'pouzdrem',
@@ -131,11 +131,11 @@ const ACCESSORY_HEAD_NOUNS = new Set([
   'hub',
   'replacement',
   'accessory', 'accessories',
-]);
+];
 
-const FOR_PREPOSITIONS = new Set([
+const DEFAULT_FOR_PREPOSITIONS = [
   'pro', 'na', 'for', 'k', 'do', 'kompatibilni', 'compatible',
-]);
+];
 
 /**
  * Returns true when the title is an accessory listed "for" the queried product.
@@ -145,18 +145,23 @@ const FOR_PREPOSITIONS = new Set([
  *  (c) Direct follow — "Remínek Apple Watch 44mm"
  *  (d) Product then accessory — "iPhone 13 kryt", "Apple Watch remínek"
  */
-function isAccessoryForQuery(titleTokens: string[], queryTokens: string[]): boolean {
+function isAccessoryForQuery(
+  titleTokens: string[],
+  queryTokens: string[],
+  accessoryHeadNouns: Set<string>,
+  forPrepositions: Set<string>,
+): boolean {
   if (titleTokens.length < 2 || queryTokens.length === 0) return false;
 
   // (a) Title must start with an accessory noun (first 2 tokens)
-  const accessoryLeadIdx = titleTokens.slice(0, 2).findIndex((t) => ACCESSORY_HEAD_NOUNS.has(t));
+  const accessoryLeadIdx = titleTokens.slice(0, 2).findIndex((t) => accessoryHeadNouns.has(t));
 
   if (accessoryLeadIdx !== -1) {
     const afterLead = titleTokens.slice(accessoryLeadIdx + 1);
 
     // (b) Query tokens appear AFTER a "for" preposition
     for (let i = accessoryLeadIdx; i < titleTokens.length - 1; i++) {
-      if (!FOR_PREPOSITIONS.has(titleTokens[i])) continue;
+      if (!forPrepositions.has(titleTokens[i])) continue;
       const afterPrep = titleTokens.slice(i + 1);
       const matchedAfterPrep = queryTokens.filter((qt) =>
         afterPrep.some((tt) => tokenMatches(tt, qt)),
@@ -181,7 +186,7 @@ function isAccessoryForQuery(titleTokens: string[], queryTokens: string[]): bool
   }
   if (lastQueryTokenPos >= 0 && lastQueryTokenPos < titleTokens.length - 1) {
     const afterProduct = titleTokens.slice(lastQueryTokenPos + 1);
-    if (afterProduct.some((t) => ACCESSORY_HEAD_NOUNS.has(t))) {
+    if (afterProduct.some((t) => accessoryHeadNouns.has(t))) {
       // Verify query tokens form the title's opening section (not just scattered matches)
       const queryMatchedBefore = queryTokens.filter((qt) =>
         titleTokens.slice(0, lastQueryTokenPos + 1).some((tt) => tokenMatches(tt, qt)),
@@ -195,7 +200,7 @@ function isAccessoryForQuery(titleTokens: string[], queryTokens: string[]): bool
 
 // ─── Stopwords ────────────────────────────────────────────────────────────────
 
-const STOPWORDS = new Set([
+const DEFAULT_STOPWORDS = [
   // Czech
   'a', 'i', 'o', 'u', 'v', 'z', 'k', 's', 'na', 'za', 'do',
   'od', 'po', 've', 'ze', 'ke', 'se', 'si', 'je', 'to', 'ta',
@@ -204,7 +209,7 @@ const STOPWORDS = new Set([
   // English
   'the', 'a', 'an', 'in', 'on', 'at', 'of', 'to', 'for',
   'and', 'or', 'but', 'with', 'is', 'are', 'was', 'be',
-]);
+];
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 
@@ -219,8 +224,8 @@ function tokenize(s: string): string[] {
     .filter(Boolean);
 }
 
-function filterQueryTokens(tokens: string[]): string[] {
-  const filtered = tokens.filter((t) => t.length > 2 && !STOPWORDS.has(t));
+function filterQueryTokens(tokens: string[], stopwords: Set<string>): string[] {
+  const filtered = tokens.filter((t) => t.length > 2 && !stopwords.has(t));
   return filtered.length > 0 ? filtered : tokens;
 }
 
@@ -280,16 +285,30 @@ export function scoreRelevance(
   query: string,
   title: string,
   description: string | null,
+  marketConfig?: Pick<MarketConfig, 'stopwords' | 'accessoryHeadNouns' | 'forPrepositions'>,
 ): number {
   const rawQueryTokens = tokenize(query);
   if (rawQueryTokens.length === 0) return 0.5;
 
-  const queryTokens = filterQueryTokens(rawQueryTokens);
+  const stopwords = new Set([
+    ...DEFAULT_STOPWORDS,
+    ...(marketConfig?.stopwords ?? []),
+  ]);
+  const accessoryHeadNouns = new Set([
+    ...DEFAULT_ACCESSORY_HEAD_NOUNS,
+    ...(marketConfig?.accessoryHeadNouns ?? []),
+  ]);
+  const forPrepositions = new Set([
+    ...DEFAULT_FOR_PREPOSITIONS,
+    ...(marketConfig?.forPrepositions ?? []),
+  ]);
+
+  const queryTokens = filterQueryTokens(rawQueryTokens, stopwords);
   const titleTokens = tokenize(title);
 
   // ── Accessory guard ───────────────────────────────────────────────────────
-  const queryMentionsAccessory = queryTokens.some((t) => ACCESSORY_HEAD_NOUNS.has(t));
-  if (!queryMentionsAccessory && isAccessoryForQuery(titleTokens, queryTokens)) {
+  const queryMentionsAccessory = queryTokens.some((t) => accessoryHeadNouns.has(t));
+  if (!queryMentionsAccessory && isAccessoryForQuery(titleTokens, queryTokens, accessoryHeadNouns, forPrepositions)) {
     return 0.05;
   }
   // ─────────────────────────────────────────────────────────────────────────
@@ -314,3 +333,4 @@ export function scoreRelevance(
 
   return Math.min(1, baseScore + titleBonus + proximity);
 }
+import type { MarketConfig } from '@sdf/types';

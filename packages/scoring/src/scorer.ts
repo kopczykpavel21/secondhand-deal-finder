@@ -1,9 +1,11 @@
 import type {
+  MarketConfig,
   NormalizedListing,
   ScoredListing,
   ScoringWeights,
   ScoreComponents,
 } from '@sdf/types';
+import { czMarket } from '@sdf/types';
 import { DEFAULT_WEIGHTS } from './weights';
 import { scoreRelevance } from './components/relevance';
 import { scoreValueForMoney } from './components/value-for-money';
@@ -15,30 +17,21 @@ import { scoreEngagement } from './components/engagement';
 
 // ─── Spam / low-quality listing detection ────────────────────────────────────
 
-const SPAM_PATTERNS = [
-  /\btel\.?\s*[:.]?\s*\d{9,}/i,        // phone number in title (Bazoš spam)
-  /whatsapp/i,
-  /call me/i,
-  /kontaktuj.{0,5}tel/i,
-  /kup(uj|te) ted/i,                    // "buy now" spam
-];
-
-/** Minimum plausible price in CZK. Anything below this is a placeholder,
- *  test listing, or pricing error — not a real offer. */
-const MIN_PLAUSIBLE_PRICE_CZK = 12;
-
 /**
  * Returns true when the listing shows signs of spam, a repost scam,
- * or an implausible price (< 12 CZK) that indicates a junk/test listing.
+ * or an implausible price that indicates a junk/test listing.
  * The spamPenalty weight is applied to the final score when this fires.
  */
-function detectLowQuality(listing: NormalizedListing): boolean {
+function detectLowQuality(
+  listing: NormalizedListing,
+  market: Pick<MarketConfig, 'spamPatterns' | 'minPlausiblePrice'>,
+): boolean {
   // Text-based spam signals
   const text = `${listing.title} ${listing.description ?? ''}`;
-  if (SPAM_PATTERNS.some((re) => re.test(text))) return true;
+  if (market.spamPatterns.some((re) => re.test(text))) return true;
 
   // Suspiciously low price — likely a placeholder, misentry, or scam bait
-  if (listing.price !== null && listing.price < MIN_PLAUSIBLE_PRICE_CZK) return true;
+  if (listing.price !== null && listing.price < market.minPlausiblePrice) return true;
 
   return false;
 }
@@ -49,55 +42,57 @@ function buildExplanation(
   components: ScoreComponents,
   listing: NormalizedListing,
   weights: ScoringWeights,
+  market: Pick<MarketConfig, 'id' | 'minPlausiblePrice'>,
 ): string[] {
   const lines: string[] = [];
+  const isPolish = market.id === 'pl';
 
   if (components.relevance >= 0.8)
-    lines.push('Výborná shoda s hledaným výrazem.');
+    lines.push(isPolish ? 'Bardzo dobra zgodność z wyszukiwanym hasłem.' : 'Výborná shoda s hledaným výrazem.');
   else if (components.relevance < 0.4)
-    lines.push('Částečná shoda — některá klíčová slova chybí.');
+    lines.push(isPolish ? 'Częściowa zgodność — brakuje części słów kluczowych.' : 'Částečná shoda — některá klíčová slova chybí.');
 
   if (weights.valueForMoney === 0) {
-    lines.push('Cena nebyla při hodnocení zohledněna.');
+    lines.push(isPolish ? 'Cena nie była uwzględniona w ocenie.' : 'Cena nebyla při hodnocení zohledněna.');
   } else if (components.valueForMoney >= 0.7) {
-    lines.push('Cena je pod mediánem pro toto hledání — výhodná koupě.');
+    lines.push(isPolish ? 'Cena jest poniżej mediany dla tego wyszukiwania — wygląda na okazję.' : 'Cena je pod mediánem pro toto hledání — výhodná koupě.');
   } else if (components.valueForMoney <= 0.35) {
-    lines.push('Cena je nad mediánem podobných inzerátů.');
+    lines.push(isPolish ? 'Cena jest powyżej mediany podobnych ofert.' : 'Cena je nad mediánem podobných inzerátů.');
   } else {
-    lines.push('Cena odpovídá průměru podobných nabídek.');
+    lines.push(isPolish ? 'Cena jest zbliżona do średniej podobnych ofert.' : 'Cena odpovídá průměru podobných nabídek.');
   }
 
   if (components.condition >= 0.8)
-    lines.push('Inzerát uvádí nový nebo skoro nový stav.');
+    lines.push(isPolish ? 'Oferta wskazuje na nowy albo prawie nowy stan.' : 'Inzerát uvádí nový nebo skoro nový stav.');
   else if (components.condition <= 0.2)
-    lines.push('Stav vypadá špatně nebo nabízeno na náhradní díly.');
+    lines.push(isPolish ? 'Stan wygląda słabo albo przedmiot jest oferowany na części.' : 'Stav vypadá špatně nebo nabízeno na náhradní díly.');
 
   if (listing.promoted)
-    lines.push('Čerstvost je neutrální — topované inzeráty se obnovují každý den, skutečné stáří není známé.');
+    lines.push(isPolish ? 'Świeżość jest neutralna — promowane oferty bywają odświeżane codziennie, więc prawdziwy wiek nie jest znany.' : 'Čerstvost je neutrální — topované inzeráty se obnovují každý den, skutečné stáří není známé.');
   else if (components.freshness >= 0.8)
-    lines.push('Inzerát byl přidán nedávno.');
+    lines.push(isPolish ? 'Oferta została dodana niedawno.' : 'Inzerát byl přidán nedávno.');
   else if (components.freshness <= 0.2)
-    lines.push('Inzerát je starší než dva týdny.');
+    lines.push(isPolish ? 'Oferta jest starsza niż dwa tygodnie.' : 'Inzerát je starší než dva týdny.');
 
   if (components.sellerTrust >= 0.75)
-    lines.push('Prodávající má vysoké hodnocení a dobré recenze.');
+    lines.push(isPolish ? 'Sprzedający ma wysoką ocenę i dobre opinie.' : 'Prodávající má vysoké hodnocení a dobré recenze.');
   else if (listing.sellerRating === null && listing.sellerReviewCount === null)
-    lines.push('Pro tento zdroj nejsou dostupná data o reputaci prodávajícího.');
+    lines.push(isPolish ? 'Dla tego źródła nie ma danych o reputacji sprzedającego.' : 'Pro tento zdroj nejsou dostupná data o reputaci prodávajícího.');
 
   if (components.spamPenalty < 0) {
-    if (listing.price !== null && listing.price < 12)
-      lines.push('Penalizace: cena je neuvěřitelně nízká — možný placeholder nebo podvod.');
+    if (listing.price !== null && listing.price < market.minPlausiblePrice)
+      lines.push(isPolish ? 'Kara: cena jest nienaturalnie niska — możliwy placeholder albo oszustwo.' : 'Penalizace: cena je neuvěřitelně nízká — možný placeholder nebo podvod.');
     else
-      lines.push('Penalizace: inzerát odpovídá vzorům spamu nebo opakovaných vkladů.');
+      lines.push(isPolish ? 'Kara: oferta wygląda jak spam albo wielokrotnie odświeżane ogłoszenie.' : 'Penalizace: inzerát odpovídá vzorům spamu nebo opakovaných vkladů.');
   }
 
   if (components.engagement >= 0.75)
-    lines.push('Vysoký počet zobrazení vzhledem ke stáří inzerátu.');
+    lines.push(isPolish ? 'Wysoka liczba wyświetleń względem wieku oferty.' : 'Vysoký počet zobrazení vzhledem ke stáří inzerátu.');
   else if (components.engagement <= 0.25 && listing.views !== null)
-    lines.push('Nízký počet zobrazení vzhledem ke stáří inzerátu.');
+    lines.push(isPolish ? 'Niska liczba wyświetleń względem wieku oferty.' : 'Nízký počet zobrazení vzhledem ke stáří inzerátu.');
 
   if (listing.shippingAvailable === true)
-    lines.push('Možnost doručení.');
+    lines.push(isPolish ? 'Dostępna wysyłka.' : 'Možnost doručení.');
 
   return lines;
 }
@@ -148,12 +143,13 @@ export function scoreListings(
   listings: NormalizedListing[],
   query: string,
   weights: ScoringWeights = DEFAULT_WEIGHTS,
+  marketConfig: MarketConfig = czMarket,
 ): ScoredListing[] {
   // Pre-compute relevance so we can filter out accessories before calculating
   // the price median — cheap cases/chargers would otherwise drag the median down
   // and make actual phones look overpriced.
   const relevanceScores = listings.map((l) =>
-    scoreRelevance(query, l.title, l.description),
+    scoreRelevance(query, l.title, l.description, marketConfig),
   );
 
   const relevantPrices = listings
@@ -187,7 +183,7 @@ export function scoreListings(
     const engagement   = scoreEngagement(listing.views, listing.likes, listing.postedAt);
 
     const promotedPenalty = listing.promoted ? w.promotedPenalty : 0;
-    const spamPenalty = detectLowQuality(listing) ? w.spamPenalty : 0;
+    const spamPenalty = detectLowQuality(listing, marketConfig) ? w.spamPenalty : 0;
 
     const components: ScoreComponents = {
       relevance,
@@ -230,7 +226,7 @@ export function scoreListings(
       ...listing,
       score,
       scoreComponents: components,
-      scoreExplanation: buildExplanation(components, listing, weights),
+      scoreExplanation: buildExplanation(components, listing, weights, marketConfig),
     };
   });
 }

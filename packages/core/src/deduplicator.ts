@@ -32,16 +32,19 @@ function normaliseTitleKey(title: string): string {
     .join(' ');
 }
 
-function priceBucket(price: number | null): string {
+function priceBucket(price: number | null, bucketSize: number): string {
   if (price === null) return 'unknown';
-  return String(Math.round(price / 500) * 500);
+  return String(Math.round(price / bucketSize) * bucketSize);
 }
 
-export function deduplicateListings(listings: NormalizedListing[]): DedupeResult {
+export function deduplicateListings(
+  listings: NormalizedListing[],
+  bucketSize = 500,
+): DedupeResult {
   const buckets = new Map<string, NormalizedListing[]>();
 
   for (const listing of listings) {
-    const key = `${normaliseTitleKey(listing.title)}|${priceBucket(listing.price)}`;
+    const key = `${normaliseTitleKey(listing.title)}|${priceBucket(listing.price, bucketSize)}`;
     const group = buckets.get(key) ?? [];
     group.push(listing);
     buckets.set(key, group);

@@ -7,13 +7,32 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
+    "dev:pl": "npm run dev --workspace=apps/web-pl",
+    "dev:worker:pl": "npm run dev --workspace=apps/worker-pl",
+    "dev:de": "npm run dev --workspace=apps/web-de",
+    "dev:worker:de": "npm run dev --workspace=apps/worker-de",
+    "dev:at": "npm run dev --workspace=apps/web-at",
+    "dev:worker:at": "npm run dev --workspace=apps/worker-at",
     "build": "npm run build --workspace=apps/web",
-    "lint": "npm run lint --workspace=apps/web"
+    "build:pl": "npm run build --workspace=apps/web-pl",
+    "build:worker:pl": "npm run build --workspace=apps/worker-pl",
+    "build:de": "npm run build --workspace=apps/web-de",
+    "build:worker:de": "npm run build --workspace=apps/worker-de",
+    "build:at": "npm run build --workspace=apps/web-at",
+    "build:worker:at": "npm run build --workspace=apps/worker-at",
+    "lint": "npm run lint --workspace=apps/web",
+    "lint:pl": "npm run lint --workspace=apps/web-pl"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@types/pg": "^8.20.0",
+    "pg": "^8.20.0",
+    "redis": "^5.12.1",
+    "tsx": "^4.21.0"
   }
 }

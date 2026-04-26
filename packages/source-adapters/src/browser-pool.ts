@@ -11,7 +11,7 @@ import type { Browser, BrowserContext, Page } from 'playwright';
 // Railway 1 GB RAM: run only one Playwright page at a time to prevent OOM.
 // Sbazar / Vinted each load a heavy React SPA — running them concurrently
 // crashes the shared Chromium process and invalidates both contexts.
-const MAX_CONTEXTS = 1;
+const MAX_CONTEXTS = Math.max(1, Number(process.env.PLAYWRIGHT_MAX_CONTEXTS ?? 1));
 
 // Hard cap on how long a single page operation may run (navigation + fn).
 // Adapters have their own shorter timeouts for individual waitForSelector

@@ -1,6 +1,19 @@
 // Shared types for the Secondhand Deal Finder
 
-export type Source = 'bazos' | 'sbazar' | 'vinted' | 'facebook' | 'aukro' | 'fler' | 'mock';
+export type Source =
+  | 'bazos'
+  | 'sbazar'
+  | 'vinted'
+  | 'facebook'
+  | 'aukro'
+  | 'fler'
+  | 'mock'
+  | 'willhaben'
+  | 'kleinanzeigen'
+  | 'shpock'
+  | 'olx'
+  | 'allegro_lokalnie'
+  | 'sprzedajemy';
 export type SourceSupportLevel = 'full' | 'partial' | 'experimental' | 'unavailable';
 export type SortOption = 'best_deal' | 'newest' | 'cheapest' | 'safest' | 'most_relevant';
 export type Condition = 'new' | 'like_new' | 'good' | 'fair' | 'poor' | 'unknown';
@@ -195,3 +208,5 @@ export interface SourceAdapter {
     'sellerName' | 'sellerRating' | 'sellerReviewCount'
   >;
 }
+
+export * from './market-config';

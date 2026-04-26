@@ -31,34 +31,36 @@
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
-import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
+import type { AdapterConfig, MarketConfig, NormalizedListing, SearchFilters } from '@sdf/types';
+import { getMarketConfig } from '@sdf/types';
 import { BaseAdapter } from '../base-adapter';
 
-const BASE_URL = 'https://www.vinted.cz';
-const API_BASE = `${BASE_URL}/api/v2/catalog/items`;
+// Default to Czech market — pass baseUrl to constructor for other locales (e.g. vinted.de)
+const DEFAULT_BASE_URL = 'https://www.vinted.cz';
 const PER_PAGE = 96; // Vinted's max per page
 const PAGES_TO_FETCH = 2; // up to 192 listings
 
-// ─── Anonymous token cache (module-level, shared across requests) ─────────────
-// Vinted issues anonymous JWTs valid for 7 days.  We cache the token to avoid
-// fetching a new one on every search request.
+// ─── Anonymous token cache (per-domain, shared across requests) ──────────────
+// Vinted issues anonymous JWTs valid for 7 days.  We cache per base URL so
+// vinted.cz and vinted.de each have their own token.
 
 interface TokenCache {
   token: string;
   expiresAt: number; // epoch ms
 }
 
-let tokenCache: TokenCache | null = null;
+const tokenCaches = new Map<string, TokenCache>();
 
-async function getAnonToken(): Promise<string> {
+async function getAnonToken(baseUrl: string): Promise<string> {
+  const cached = tokenCaches.get(baseUrl);
   // Return cached token if still valid (with 5-minute safety margin)
-  if (tokenCache && Date.now() < tokenCache.expiresAt - 5 * 60_000) {
-    return tokenCache.token;
+  if (cached && Date.now() < cached.expiresAt - 5 * 60_000) {
+    return cached.token;
   }
 
   // Fetch a fresh anonymous token by visiting the catalog page.
   // Vinted automatically sets access_token_web in the Set-Cookie header.
-  const res = await fetch(`${BASE_URL}/catalog?search_text=a`, {
+  const res = await fetch(`${baseUrl}/catalog?search_text=a`, {
     method: 'GET',
     redirect: 'manual', // don't follow — we only need the headers
     headers: {
@@ -87,7 +89,7 @@ async function getAnonToken(): Promise<string> {
     // ignore — use default expiry
   }
 
-  tokenCache = { token, expiresAt };
+  tokenCaches.set(baseUrl, { token, expiresAt });
   return token;
 }
 
@@ -151,8 +153,21 @@ export class VintedAdapter extends BaseAdapter {
   source = 'vinted' as const;
   supportLevel = 'full' as const; // clean API, very reliable
 
-  constructor(config: Partial<AdapterConfig> = {}) {
-    super({ timeout: 15_000, rateLimitMs: 1_000, ...config });
+  private readonly baseUrl: string;
+
+  constructor(
+    config: Partial<AdapterConfig & { baseUrl?: string; marketConfig?: MarketConfig }> = {},
+  ) {
+    const { baseUrl, marketConfig, ...adapterConfig } = config;
+    const inferredMarket =
+      marketConfig ??
+      (baseUrl?.includes('.pl')
+        ? getMarketConfig('pl')
+        : baseUrl?.includes('.de')
+          ? getMarketConfig('de')
+          : getMarketConfig('cz'));
+    super({ timeout: 15_000, rateLimitMs: 1_000, ...adapterConfig }, inferredMarket);
+    this.baseUrl = baseUrl ?? DEFAULT_BASE_URL;
   }
 
   buildSearchUrl(query: string, filters?: SearchFilters, page = 1): string {
@@ -163,7 +178,7 @@ export class VintedAdapter extends BaseAdapter {
     });
     if (filters?.priceMin != null) params.set('price_from', String(filters.priceMin));
     if (filters?.priceMax != null) params.set('price_to', String(filters.priceMax));
-    return `${API_BASE}?${params.toString()}`;
+    return `${this.baseUrl}/api/v2/catalog/items?${params.toString()}`;
   }
 
   async searchListings(
@@ -180,7 +195,7 @@ export class VintedAdapter extends BaseAdapter {
     query: string,
     filters?: SearchFilters,
   ): Promise<NormalizedListing[]> {
-    const token = await getAnonToken();
+    const token = await getAnonToken(this.baseUrl);
     this.log(`Token acquired (${token.slice(0, 20)}…)`);
 
     const results: NormalizedListing[] = [];
@@ -196,15 +211,15 @@ export class VintedAdapter extends BaseAdapter {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'application/json',
-          'Accept-Language': 'cs-CZ,cs;q=0.9',
-          'Referer': BASE_URL,
+          'Accept-Language': this.marketConfig.locale,
+          'Referer': this.baseUrl,
         },
         signal: AbortSignal.timeout(this.config.timeout),
       });
 
       if (res.status === 401) {
         // Token expired mid-run — invalidate cache and retry once
-        tokenCache = null;
+        tokenCaches.delete(this.baseUrl);
         throw new Error('Vinted: token expired (401) — will refresh on retry');
       }
       if (!res.ok) {
@@ -228,7 +243,7 @@ export class VintedAdapter extends BaseAdapter {
           id: this.makeId(id),
           source: 'vinted',
           sourceListingId: id,
-          url: item.url ?? `${BASE_URL}${item.path}`,
+          url: item.url ?? `${this.baseUrl}${item.path}`,
           title: item.title,
           description: null,
           price,

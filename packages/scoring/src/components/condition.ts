@@ -1,4 +1,4 @@
-import type { Condition } from '@sdf/types';
+import type { Condition, MarketConfig } from '@sdf/types';
 
 const CONDITION_SCORES: Record<Condition, number> = {
   new: 1.0,
@@ -23,6 +23,11 @@ const NEW_SIGNALS = [
   'zapečetěný', 'zapečetěná',
   'v záruční době', 'v záruce', 'záruční', 'záruka',
   'v krabici', 'boxed', 'sealed',
+  // German — multi-word first (eBay.de / willhaben condition labels)
+  'neu mit etikett', 'neu ohne etikett', 'neu, mit etikett', 'neu, ohne etikett',
+  'neues objekt', 'originalverpackt', 'ungeöffnet', 'unbenutzt', 'versiegelt',
+  // German — single word LAST (avoid shadowing multi-word phrases above)
+  'neu',
   // English
   'new', 'brand new', 'never used', 'unused',
 ];
@@ -94,15 +99,24 @@ const POOR_SIGNALS = [
   'damaged', 'broken', 'for parts', 'not working', 'faulty', 'cracked',
 ];
 
-export function normalizeCondition(conditionText: string | null): Condition {
+export function normalizeCondition(
+  conditionText: string | null,
+  marketConfig?: Pick<MarketConfig, 'conditionSignals'>,
+): Condition {
   if (!conditionText) return 'unknown';
   const lower = conditionText.toLowerCase();
 
-  if (NEW_SIGNALS.some((s) => lower.includes(s))) return 'new';
-  if (LIKE_NEW_SIGNALS.some((s) => lower.includes(s))) return 'like_new';
-  if (POOR_SIGNALS.some((s) => lower.includes(s))) return 'poor';
-  if (FAIR_SIGNALS.some((s) => lower.includes(s))) return 'fair';
-  if (GOOD_SIGNALS.some((s) => lower.includes(s))) return 'good';
+  const newSignals = [...(marketConfig?.conditionSignals.new ?? []), ...NEW_SIGNALS];
+  const likeNewSignals = [...(marketConfig?.conditionSignals.like_new ?? []), ...LIKE_NEW_SIGNALS];
+  const goodSignals = [...(marketConfig?.conditionSignals.good ?? []), ...GOOD_SIGNALS];
+  const fairSignals = [...(marketConfig?.conditionSignals.fair ?? []), ...FAIR_SIGNALS];
+  const poorSignals = [...(marketConfig?.conditionSignals.poor ?? []), ...POOR_SIGNALS];
+
+  if (newSignals.some((s) => lower.includes(s))) return 'new';
+  if (likeNewSignals.some((s) => lower.includes(s))) return 'like_new';
+  if (poorSignals.some((s) => lower.includes(s))) return 'poor';
+  if (fairSignals.some((s) => lower.includes(s))) return 'fair';
+  if (goodSignals.some((s) => lower.includes(s))) return 'good';
 
   return 'unknown';
 }

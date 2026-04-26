@@ -1,12 +1,13 @@
 import type {
   AdapterConfig,
+  MarketConfig,
   NormalizedListing,
   SearchFilters,
   Source,
   SourceAdapter,
   SourceSupportLevel,
 } from '@sdf/types';
-import { DEFAULT_ADAPTER_CONFIG } from '@sdf/types';
+import { DEFAULT_ADAPTER_CONFIG, czMarket, parseRelativeDate as parseMarketRelativeDate } from '@sdf/types';
 import type { Page } from 'playwright';
 import { withPooledPage } from './browser-pool';
 import { normalizeCondition } from '@sdf/scoring';
@@ -16,10 +17,15 @@ export abstract class BaseAdapter implements SourceAdapter {
   abstract supportLevel: SourceSupportLevel;
 
   config: AdapterConfig;
+  protected marketConfig: MarketConfig;
   protected logs: string[] = [];
 
-  constructor(config: Partial<AdapterConfig> = {}) {
+  constructor(
+    config: Partial<AdapterConfig> = {},
+    marketConfig: MarketConfig = czMarket,
+  ) {
     this.config = { ...DEFAULT_ADAPTER_CONFIG, ...config };
+    this.marketConfig = marketConfig;
   }
 
   abstract searchListings(
@@ -84,38 +90,18 @@ export abstract class BaseAdapter implements SourceAdapter {
     return isNaN(d.getTime()) ? null : d;
   }
 
-  /** Parse Czech relative timestamps like "před 2 dny", "před hodinou" */
+  protected parseRelativeDate(text: string | null | undefined): Date | null {
+    const parsed = parseMarketRelativeDate(text, this.marketConfig);
+    return parsed ?? this.safeDate(text);
+  }
+
+  /** Backward-compatible alias used by older Czech adapters. */
   protected parseCzechRelativeDate(text: string | null | undefined): Date | null {
-    if (!text) return null;
-
-    const now = Date.now();
-    const lower = text.toLowerCase().trim();
-
-    const patterns: Array<[RegExp, number]> = [
-      [/před (\d+) minut/, 60_000],
-      [/před (\d+) hodin/, 3_600_000],
-      [/před hodinou/, 3_600_000],
-      [/před (\d+) dn/, 86_400_000],
-      [/před dnem/, 86_400_000],
-      [/před (\d+) týdn/, 604_800_000],
-      [/před týdnem/, 604_800_000],
-      [/před (\d+) měsíc/, 2_592_000_000],
-    ];
-
-    for (const [re, msPerUnit] of patterns) {
-      const match = lower.match(re);
-      if (match) {
-        const n = match[1] ? parseInt(match[1], 10) : 1;
-        return new Date(now - n * msPerUnit);
-      }
-    }
-
-    // Try ISO / standard formats as fallback
-    return this.safeDate(text);
+    return this.parseRelativeDate(text);
   }
 
   protected inferCondition(conditionText: string | null): NormalizedListing['condition'] {
-    return normalizeCondition(conditionText);
+    return normalizeCondition(conditionText, this.marketConfig);
   }
 
   protected log(msg: string): void {

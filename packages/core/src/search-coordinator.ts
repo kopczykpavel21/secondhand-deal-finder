@@ -1,4 +1,5 @@
 import type {
+  MarketConfig,
   NormalizedListing,
   SearchFilters,
   SearchRequest,
@@ -10,9 +11,15 @@ import type {
   SourceStatus,
   SortOption,
 } from '@sdf/types';
+import { czMarket } from '@sdf/types';
 import type { SourceAdapter } from '@sdf/types';
 import { scoreListings, DEFAULT_WEIGHTS } from '@sdf/scoring';
 import { deduplicateListings } from './deduplicator';
+import {
+  createSearchCacheKey,
+  DEFAULT_SEARCH_CACHE_TTL_MS,
+  type SearchCache,
+} from './search-cache';
 
 // ─── Minimal async queue — delivers items in arrival order ───────────────────
 
@@ -41,41 +48,41 @@ const MAX_LIMIT = 100;
 // HTTP adapters (Bazoš, Aukro) finish in < 5 s so the timeout never triggers.
 const ADAPTER_TIMEOUT_MS = 55_000;
 
-// ─── Result cache ─────────────────────────────────────────────────────────────
-// Caches complete search responses for CACHE_TTL_MS to avoid re-scraping
-// identical queries within the same server session.
-
-const CACHE_TTL_MS = 20 * 60 * 1_000; // 20 minutes
-
-interface CacheEntry {
-  response: SearchResponse;
-  expiresAt: number;
+export interface SearchCoordinatorOptions {
+  marketConfig?: MarketConfig;
+  cache?: SearchCache | null;
+  cacheNamespace?: string;
 }
 
-function cacheKey(request: SearchRequest): string {
-  return JSON.stringify({
-    q: request.query.toLowerCase().trim(),
-    f: request.filters ?? {},
-    l: Math.min(request.limit ?? DEFAULT_LIMIT, MAX_LIMIT),
-  });
+function isMarketConfigLike(value: SearchCoordinatorOptions | MarketConfig): value is MarketConfig {
+  return typeof (value as MarketConfig)?.id === 'string';
 }
 
 export class SearchCoordinator {
   private adapters: Map<Source, SourceAdapter>;
-  private cache = new Map<string, CacheEntry>();
+  private marketConfig: MarketConfig;
+  private cache: SearchCache | null;
+  private cacheNamespace: string;
 
-  constructor(adapters: SourceAdapter[]) {
+  constructor(
+    adapters: SourceAdapter[],
+    config: SearchCoordinatorOptions | MarketConfig = czMarket,
+  ) {
+    const options = isMarketConfigLike(config)
+      ? { marketConfig: config, cache: null }
+      : config;
     this.adapters = new Map(adapters.map((a) => [a.source, a]));
+    this.marketConfig = options.marketConfig ?? czMarket;
+    this.cache = options.cache ?? null;
+    this.cacheNamespace = options.cacheNamespace ?? this.marketConfig.id;
   }
 
   async search(request: SearchRequest): Promise<SearchResponse> {
     // Serve from cache when debug is not requested
-    if (!request.debug) {
-      const key = cacheKey(request);
-      const cached = this.cache.get(key);
-      if (cached && Date.now() < cached.expiresAt) {
-        return cached.response;
-      }
+    const key = createSearchCacheKey(request, DEFAULT_LIMIT, MAX_LIMIT, this.cacheNamespace);
+    if (!request.debug && this.cache) {
+      const cached = await this.cache.get(key);
+      if (cached) return cached;
     }
 
     const start = Date.now();
@@ -113,11 +120,11 @@ export class SearchCoordinator {
 
     // Deduplicate
     const { listings: deduped, groups: dedupeGroups } =
-      deduplicateListings(allListings);
+      deduplicateListings(allListings, this.marketConfig.priceBucketSize);
 
     // Score all listings (use relevance-heavy weights when requested)
     const weights = getWeightsForSort(filters?.sortBy);
-    const scored = scoreListings(deduped, query, weights);
+    const scored = scoreListings(deduped, query, weights, this.marketConfig);
 
     // Post-scoring dedup: keep only the highest-scored listing per duplicate group
     const dedupeFiltered = removeScoredDuplicates(scored, dedupeGroups);
@@ -150,12 +157,8 @@ export class SearchCoordinator {
     }
 
     // Store in cache (only non-debug responses)
-    if (!debug) {
-      this.cache.set(cacheKey(request), { response, expiresAt: Date.now() + CACHE_TTL_MS });
-      // Evict expired entries to prevent unbounded growth
-      for (const [k, v] of this.cache) {
-        if (Date.now() >= v.expiresAt) this.cache.delete(k);
-      }
+    if (!debug && this.cache) {
+      await this.cache.set(key, response, DEFAULT_SEARCH_CACHE_TTL_MS);
     }
 
     return response;
@@ -169,6 +172,21 @@ export class SearchCoordinator {
    * slowest source.
    */
   async *searchStream(request: SearchRequest): AsyncGenerator<SearchStreamEvent> {
+    const key = createSearchCacheKey(request, DEFAULT_LIMIT, MAX_LIMIT, this.cacheNamespace);
+    if (!request.debug && this.cache) {
+      const cached = await this.cache.get(key);
+      if (cached) {
+        yield {
+          type: 'complete',
+          results: cached.results,
+          total: cached.total,
+          sources: cached.sources,
+          executionMs: cached.executionMs,
+        };
+        return;
+      }
+    }
+
     const start = Date.now();
     const { query, filters } = request;
     const limit = Math.min(request.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
@@ -202,8 +220,8 @@ export class SearchCoordinator {
       allStatuses.push(status);
 
       // Re-score everything accumulated so far
-      const { listings: deduped, groups } = deduplicateListings(allListings);
-      const scored = scoreListings(deduped, query, weights);
+      const { listings: deduped, groups } = deduplicateListings(allListings, this.marketConfig.priceBucketSize);
+      const scored = scoreListings(deduped, query, weights, this.marketConfig);
       const filtered = removeScoredDuplicates(scored, groups);
       const sorted = sortResults(filtered, filters?.sortBy ?? 'best_deal');
 
@@ -218,18 +236,29 @@ export class SearchCoordinator {
     }
 
     // Final event with complete metadata
-    const { listings: deduped, groups } = deduplicateListings(allListings);
-    const scored = scoreListings(deduped, query, weights);
+    const { listings: deduped, groups } = deduplicateListings(allListings, this.marketConfig.priceBucketSize);
+    const scored = scoreListings(deduped, query, weights, this.marketConfig);
     const filtered = removeScoredDuplicates(scored, groups);
     const sorted = sortResults(filtered, filters?.sortBy ?? 'best_deal');
 
-    yield {
+    const finalEvent: SearchStreamEvent = {
       type: 'complete',
       results: sorted.slice(0, limit),
       total: sorted.length,
       sources: allStatuses,
       executionMs: Date.now() - start,
     };
+    yield finalEvent;
+
+    if (!request.debug && this.cache) {
+      await this.cache.set(key, {
+        results: finalEvent.results,
+        total: finalEvent.total,
+        sources: finalEvent.sources,
+        query,
+        executionMs: finalEvent.executionMs,
+      }, DEFAULT_SEARCH_CACHE_TTL_MS);
+    }
   }
 
   private async runAdapter(

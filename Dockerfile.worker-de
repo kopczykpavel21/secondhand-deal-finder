@@ -1,0 +1,15 @@
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+COPY package.json package-lock.json ./
+COPY apps ./apps
+COPY packages ./packages
+
+RUN npm ci
+RUN npx playwright install --with-deps chromium
+
+CMD ["npm", "run", "start", "--workspace=apps/worker-de"]

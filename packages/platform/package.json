@@ -1,0 +1,14 @@
+{
+  "name": "@sdf/platform",
+  "version": "0.1.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {},
+  "dependencies": {
+    "@sdf/core": "*",
+    "@sdf/source-adapters": "*",
+    "@sdf/types": "*",
+    "pg": "^8.20.0",
+    "redis": "^5.12.1"
+  }
+}

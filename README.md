@@ -154,6 +154,10 @@ Then restart the dev server.
 
 ## TODO — Hardening for Production
 
+For a concrete Polish-market production rollout plan, see [docs/DEPLOYMENT-PLAN-PL.md](/Users/Pavel/Downloads/Alexandra_Web/secondhand-deal-finder/docs/DEPLOYMENT-PLAN-PL.md).
+
+For the recommended mixed production deployment (`Vercel` for web apps, `Railway` for Redis/Postgres/workers), see [docs/DEPLOYMENT-VERCEL-RAILWAY.md](/Users/Pavel/Downloads/Alexandra_Web/secondhand-deal-finder/docs/DEPLOYMENT-VERCEL-RAILWAY.md).
+
 ### Reliability
 - [ ] Add Redis cache layer (`REDIS_URL`) — cache search results for 5 minutes
 - [ ] Implement per-source circuit breaker (stop retrying failing sources per session)
