@@ -100,10 +100,10 @@ export default function HomePage() {
             Beta · Bazoš · Vinted · Aukro · Fler
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
-            Secondhand Deal Finder
+            Výhodník
           </h1>
           <p className="mt-2 text-slate-500 text-base sm:text-lg max-w-md mx-auto">
-            Najdeme nejlepší nabídky napříč bazary a seřadíme je podle skutečné hodnoty.
+            Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.
           </p>
         </div>
 
@@ -186,6 +186,30 @@ export default function HomePage() {
                 />
               ))}
             </div>
+
+            {/* "Nenašli jste" relevance switch — shown when sorted by deal score */}
+            {isSuccess && (filters.sortBy ?? 'best_deal') !== 'most_relevant' && (
+              <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-700">Nenašli jste co jste hledali?</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Zkuste řazení podle nejlepší shody — ignoruje cenu a upřednostní přesné výsledky.
+                    Hodí se např. při hledání aut: zadejte min. cenu 10 000 Kč, ať odfiltrujete díly a příslušenství.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const updated = { ...filters, sortBy: 'most_relevant' as const };
+                    setFilters(updated);
+                    setPage(0);
+                    search(currentQuery, { ...updated, debug: debugMode, limit: FETCH_LIMIT });
+                  }}
+                  className="shrink-0 px-4 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-700 hover:border-brand-400 hover:text-brand-600 transition-colors shadow-sm whitespace-nowrap"
+                >
+                  Hledat podle shody →
+                </button>
+              </div>
+            )}
 
             {/* Pagination */}
             {(hasPrevPage || hasNextPage) && (

@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Secondhand Deal Finder',
-  description: 'Najdeme nejlepší secondhand nabídky napříč Bazoš, Vinted, Aukro a Fler. Řazeno podle skutečné hodnoty.',
+  title: 'Výhodník',
+  description: 'Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    title: 'Deal Finder',
+    title: 'Výhodník',
     statusBarStyle: 'default',
   },
   icons: {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     apple: '/icon.svg',
   },
   openGraph: {
-    title: 'Secondhand Deal Finder',
+    title: 'Výhodník',
     description: 'Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.',
     type: 'website',
     locale: 'cs_CZ',

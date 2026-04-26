@@ -24,12 +24,12 @@ const SORT_OPTIONS: { id: SortOption; label: string; hint?: string }[] = [
   { id: 'safest',        label: 'Nejdůvěryhodnější' },
 ];
 
-const CONDITIONS: { id: Condition; label: string; emoji: string }[] = [
-  { id: 'new',      label: 'Nové',        emoji: '✨' },
-  { id: 'like_new', label: 'Jako nové',   emoji: '⭐' },
-  { id: 'good',     label: 'Dobrý stav',  emoji: '👍' },
-  { id: 'fair',     label: 'Opotřebené',  emoji: '🔧' },
-  { id: 'poor',     label: 'Poškozené',   emoji: '⚠️' },
+const CONDITIONS: { id: Condition; label: string }[] = [
+  { id: 'new',      label: 'Nové'       },
+  { id: 'like_new', label: 'Jako nové'  },
+  { id: 'good',     label: 'Dobrý stav' },
+  { id: 'fair',     label: 'Opotřebené' },
+  { id: 'poor',     label: 'Poškozené'  },
 ];
 
 const BADGE_STYLE: Record<string, string> = {
@@ -164,7 +164,6 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
                         : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300',
                     )}
                   >
-                    <span className="text-base leading-none">{c.emoji}</span>
                     {c.label}
                   </button>
                 );
