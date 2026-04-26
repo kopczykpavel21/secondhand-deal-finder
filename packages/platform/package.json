@@ -8,6 +8,7 @@
     "@sdf/core": "*",
     "@sdf/source-adapters": "*",
     "@sdf/types": "*",
+    "@types/pg": "^8.20.0",
     "pg": "^8.20.0",
     "redis": "^5.12.1"
   }
