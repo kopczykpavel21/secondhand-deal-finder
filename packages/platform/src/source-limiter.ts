@@ -41,6 +41,10 @@ const DEFAULT_LIMITS: Partial<Record<Source, number>> = {
   willhaben: 2,
   kleinanzeigen: 2,
   shpock: 2,
+  bazos: 2,
+  sbazar: 2,
+  aukro: 2,
+  fler: 2,
 };
 
 export class SourceConcurrencyLimiter {

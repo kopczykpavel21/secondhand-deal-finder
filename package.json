@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
+    "dev:worker:cz": "npm run dev --workspace=apps/worker-cz",
     "dev:pl": "npm run dev --workspace=apps/web-pl",
     "dev:worker:pl": "npm run dev --workspace=apps/worker-pl",
     "dev:de": "npm run dev --workspace=apps/web-de",
@@ -14,6 +15,7 @@
     "dev:at": "npm run dev --workspace=apps/web-at",
     "dev:worker:at": "npm run dev --workspace=apps/worker-at",
     "build": "npm run build --workspace=apps/web",
+    "build:worker:cz": "npm run build --workspace=apps/worker-cz",
     "build:pl": "npm run build --workspace=apps/web-pl",
     "build:worker:pl": "npm run build --workspace=apps/worker-pl",
     "build:de": "npm run build --workspace=apps/web-de",

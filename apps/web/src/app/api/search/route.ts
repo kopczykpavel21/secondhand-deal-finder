@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { SearchCoordinator } from '@sdf/core';
-import { MockAdapter } from '@sdf/source-adapters';
-import { BazosAdapter } from '@sdf/source-adapters';
-import { SbazarAdapter } from '@sdf/source-adapters';
-import { VintedAdapter } from '@sdf/source-adapters';
-import { FacebookAdapter } from '@sdf/source-adapters';
-import { AukroAdapter } from '@sdf/source-adapters';
-
-// ─── Request schema ───────────────────────────────────────────────────────────
+import { createSearchCacheKey } from '@sdf/core';
+import type { Source } from '@sdf/types';
+import {
+  checkRateLimit,
+  createCzechSearchCoordinator,
+  enqueueSearchJob,
+  getSearchCache,
+  getSearchJobResult,
+  getSearchJobState,
+  isWorkerSearchEnabled,
+} from '@sdf/platform';
 
 const SearchSchema = z.object({
   query: z.string().min(1).max(200),
@@ -20,7 +22,7 @@ const SearchSchema = z.object({
     .string()
     .optional()
     .transform((v) =>
-      v ? (v.split(',') as ('bazos' | 'sbazar' | 'vinted' | 'facebook' | 'aukro' | 'mock')[]) : undefined,
+      v ? (v.split(',') as Source[]) : undefined,
     ),
   sortBy: z
     .enum(['best_deal', 'newest', 'cheapest', 'safest', 'most_relevant'])
@@ -33,45 +35,33 @@ const SearchSchema = z.object({
   limit: z.coerce.number().min(1).max(50).optional().default(25),
 });
 
-// ─── Adapter factory ──────────────────────────────────────────────────────────
+const searchCache = getSearchCache();
+const inlineCoordinator = createCzechSearchCoordinator({ cache: searchCache });
 
-function buildAdapters() {
-  const useMock = process.env.USE_MOCK_ADAPTERS === 'true';
-  if (useMock) {
-    return [new MockAdapter()];
-  }
-
-  const adapters = [];
-
-  // Always try Bazoš (most reliable)
-  adapters.push(new BazosAdapter());
-
-  // Sbazar — partial support
-  if (process.env.ENABLE_SBAZAR !== 'false') {
-    adapters.push(new SbazarAdapter());
-  }
-
-  // Vinted — experimental
-  if (process.env.ENABLE_VINTED === 'true') {
-    adapters.push(new VintedAdapter());
-  }
-
-  // Facebook — experimental (likely returns 0 results without auth)
-  if (process.env.ENABLE_FACEBOOK === 'true') {
-    adapters.push(new FacebookAdapter());
-  }
-
-  // Aukro — experimental, buy-now listings only; first source with seller ratings
-  if (process.env.ENABLE_AUKRO === 'true') {
-    adapters.push(new AukroAdapter());
-  }
-
-  return adapters;
+function clientIdentifier(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'anonymous'
+  );
 }
 
-const coordinator = new SearchCoordinator(buildAdapters());
+async function waitForJobResult(jobId: string, timeoutMs: number): Promise<Awaited<ReturnType<typeof getSearchJobResult>>> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const result = await getSearchJobResult(jobId);
+    if (result) return result;
 
-// ─── Route handler ────────────────────────────────────────────────────────────
+    const state = await getSearchJobState(jobId);
+    if (state?.status === 'failed') {
+      throw new Error(state.error ?? 'Vyhledávání selhalo');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  return null;
+}
 
 export async function GET(req: NextRequest) {
   const params = Object.fromEntries(req.nextUrl.searchParams.entries());
@@ -79,7 +69,7 @@ export async function GET(req: NextRequest) {
 
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Invalid request', issues: parsed.error.flatten() },
+      { error: 'Neplatný požadavek', issues: parsed.error.flatten() },
       { status: 400 },
     );
   }
@@ -88,12 +78,68 @@ export async function GET(req: NextRequest) {
     parsed.data;
 
   try {
-    const result = await coordinator.search({
+    const rateLimit = await checkRateLimit({
+      namespace: 'search',
+      identifier: clientIdentifier(req),
+      limit: Number(process.env.SEARCH_RATE_LIMIT ?? 20),
+      windowMs: Number(process.env.SEARCH_RATE_WINDOW_MS ?? 60_000),
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', retryAfterMs: rateLimit.retryAfterMs },
+        { status: 429 },
+      );
+    }
+
+    const searchRequest = {
       query,
       filters: { priceMin, priceMax, location, locationRadius, sources, sortBy },
       debug,
       limit,
-    });
+    };
+
+    if (debug || !isWorkerSearchEnabled()) {
+      const result = await inlineCoordinator.search(searchRequest);
+      return NextResponse.json(result, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
+    }
+
+    const cached = await searchCache.get(createSearchCacheKey(searchRequest, 50, 100, 'cz'));
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
+    }
+
+    const job = await enqueueSearchJob('cz', searchRequest);
+    if (!job) {
+      const result = await inlineCoordinator.search(searchRequest);
+      return NextResponse.json(result, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
+    }
+
+    const result = await waitForJobResult(
+      job.jobId,
+      Number(process.env.SEARCH_SYNC_WAIT_MS ?? 25_000),
+    );
+
+    if (!result) {
+      const fallback = await inlineCoordinator.search(searchRequest);
+      return NextResponse.json(fallback, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
+        },
+      });
+    }
 
     return NextResponse.json(result, {
       headers: {
@@ -102,6 +148,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error('[api/search] Unhandled error:', err);
-    return NextResponse.json({ error: 'Search failed' }, { status: 500 });
+    return NextResponse.json({ error: 'Vyhledávání selhalo' }, { status: 500 });
   }
 }

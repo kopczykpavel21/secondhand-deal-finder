@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { listFeedbackEntries, saveFeedbackEntry, type FeedbackEntry } from '@sdf/platform';
 
-export interface FeedbackEntry {
-  id: string;
-  submittedAt: string;
-  rating: number;
-  improvements: string[];
-  comment: string | null;
-  email: string | null;
-}
-
-// In-memory store — survives until the next deploy/restart.
-// Each entry is also printed to stdout so Railway's log history keeps them.
-const responses: FeedbackEntry[] = [];
+export type { FeedbackEntry } from '@sdf/platform';
 
 // POST /api/feedback
 export async function POST(req: NextRequest) {
@@ -27,7 +17,7 @@ export async function POST(req: NextRequest) {
       ? body.rating
       : null;
     if (!rating) {
-      return NextResponse.json({ error: 'rating is required (1–5)' }, { status: 400 });
+      return NextResponse.json({ error: 'rating je povinné (1–5)' }, { status: 400 });
     }
 
     const improvements = Array.isArray(body.improvements)
@@ -42,28 +32,24 @@ export async function POST(req: NextRequest) {
       ? body.email.trim().slice(0, 200)
       : null;
 
-    const entry: FeedbackEntry = {
-      id: `fb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      submittedAt: new Date().toISOString(),
+    const entry: FeedbackEntry = await saveFeedbackEntry({
       rating,
       improvements,
       comment,
       email,
-    };
+    });
 
-    responses.push(entry);
-
-    // Log to stdout — visible in Railway's log history even after restarts
     console.log('[feedback]', JSON.stringify(entry));
 
     return NextResponse.json({ ok: true, id: entry.id });
   } catch {
-    return NextResponse.json({ error: 'invalid request' }, { status: 400 });
+    return NextResponse.json({ error: 'neplatný požadavek' }, { status: 400 });
   }
 }
 
-// GET /api/feedback — returns all in-memory responses (used by admin page)
+// GET /api/feedback — used by admin page
 export async function GET() {
+  const responses = await listFeedbackEntries();
   const avg = responses.length > 0
     ? (responses.reduce((s, r) => s + r.rating, 0) / responses.length).toFixed(1)
     : null;
@@ -71,6 +57,6 @@ export async function GET() {
   return NextResponse.json({
     total: responses.length,
     averageRating: avg,
-    responses: [...responses].reverse(), // newest first
+    responses: [...responses].reverse(),
   });
 }

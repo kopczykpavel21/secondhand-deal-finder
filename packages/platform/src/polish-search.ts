@@ -2,9 +2,13 @@ import { SearchCoordinator, type SearchCache } from '@sdf/core';
 import { getMarketConfig } from '@sdf/types';
 import type { SourceAdapter } from '@sdf/types';
 import {
+  AukroAdapter,
+  BazosAdapter,
+  FlerAdapter,
   KleinanzeigeAdapter,
   MockAdapter,
   OlxAdapter,
+  SbazarAdapter,
   ShpockAdapter,
   SprzedajemyAdapter,
   VintedAdapter,
@@ -124,6 +128,40 @@ export function createAustriaSearchCoordinator(options: {
 
 export function createProductionAustriaSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
   return createAustriaSearchCoordinator({
+    cache: cache ?? null,
+    limiter: createSourceConcurrencyLimiter(),
+  });
+}
+
+export function buildCzechAdapters(options: {
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SourceAdapter[] {
+  if (process.env.USE_MOCK_ADAPTERS === 'true') {
+    return [new MockAdapter()];
+  }
+
+  const adapters: SourceAdapter[] = [new BazosAdapter()];
+  if (process.env.ENABLE_SBAZAR !== 'false') adapters.push(new SbazarAdapter());
+  if (process.env.ENABLE_VINTED !== 'false') adapters.push(new VintedAdapter({ marketConfig: getMarketConfig('cz') }));
+  if (process.env.ENABLE_AUKRO !== 'false') adapters.push(new AukroAdapter());
+  if (process.env.ENABLE_FLER !== 'false') adapters.push(new FlerAdapter());
+
+  if (!options.limiter) return adapters;
+  return adapters.map((adapter) => throttleAdapter(adapter, options.limiter!));
+}
+
+export function createCzechSearchCoordinator(options: {
+  cache?: SearchCache | null;
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SearchCoordinator {
+  return new SearchCoordinator(
+    buildCzechAdapters({ limiter: options.limiter }),
+    { marketConfig: getMarketConfig('cz'), cache: options.cache ?? null, cacheNamespace: 'cz' },
+  );
+}
+
+export function createProductionCzechSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
+  return createCzechSearchCoordinator({
     cache: cache ?? null,
     limiter: createSourceConcurrencyLimiter(),
   });
