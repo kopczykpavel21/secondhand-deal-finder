@@ -100,7 +100,7 @@ export default function HomePage() {
             Beta · Bazoš · Vinted · Aukro · Fler
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
-            Výhodník
+            Najdi Levně
           </h1>
           <p className="mt-2 text-slate-500 text-base sm:text-lg max-w-md mx-auto">
             Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.
