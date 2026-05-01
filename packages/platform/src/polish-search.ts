@@ -4,6 +4,7 @@ import type { SourceAdapter } from '@sdf/types';
 import {
   AukroAdapter,
   BazosAdapter,
+  FacebookAdapter,
   FlerAdapter,
   KleinanzeigeAdapter,
   MockAdapter,
@@ -162,6 +163,44 @@ export function createCzechSearchCoordinator(options: {
 
 export function createProductionCzechSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
   return createCzechSearchCoordinator({
+    cache: cache ?? null,
+    limiter: createSourceConcurrencyLimiter(),
+  });
+}
+
+export function buildGreeceAdapters(options: {
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SourceAdapter[] {
+  if (process.env.USE_MOCK_ADAPTERS === 'true') {
+    return [new MockAdapter()];
+  }
+
+  const adapters: SourceAdapter[] = [];
+  if (process.env.ENABLE_VINTED !== 'false') {
+    adapters.push(new VintedAdapter({
+      baseUrl: 'https://www.vinted.gr',
+      marketConfig: getMarketConfig('gr'),
+    }));
+  }
+  if (process.env.ENABLE_FACEBOOK !== 'false') adapters.push(new FacebookAdapter());
+  if (process.env.ENABLE_SHPOCK !== 'false') adapters.push(new ShpockAdapter());
+
+  if (!options.limiter) return adapters;
+  return adapters.map((adapter) => throttleAdapter(adapter, options.limiter!));
+}
+
+export function createGreeceSearchCoordinator(options: {
+  cache?: SearchCache | null;
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SearchCoordinator {
+  return new SearchCoordinator(
+    buildGreeceAdapters({ limiter: options.limiter }),
+    { marketConfig: getMarketConfig('gr'), cache: options.cache ?? null, cacheNamespace: 'gr' },
+  );
+}
+
+export function createProductionGreeceSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
+  return createGreeceSearchCoordinator({
     cache: cache ?? null,
     limiter: createSourceConcurrencyLimiter(),
   });
