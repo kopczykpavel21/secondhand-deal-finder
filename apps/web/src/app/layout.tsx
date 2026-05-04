@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Najdi Levně',
+  title: 'Z druhé ruky',
   description: 'Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    title: 'Najdi Levně',
+    title: 'Z druhé ruky',
     statusBarStyle: 'default',
   },
   icons: {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     apple: '/icon.svg',
   },
   openGraph: {
-    title: 'Najdi Levně',
+    title: 'Z druhé ruky',
     description: 'Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.',
     type: 'website',
     locale: 'cs_CZ',
