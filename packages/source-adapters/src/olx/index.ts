@@ -70,6 +70,7 @@ function firstImage(value: unknown): string | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
   return normalizeOlxUrl(
+    asString(record.link) ??
     asString(record.url) ??
     asString(record.src) ??
     asString(record.imageUrl) ??
@@ -184,6 +185,7 @@ export class OlxAdapter extends BaseAdapter {
         firstImage(obj.image) ??
         firstImage(obj.images) ??
         firstImage(obj.photo) ??
+        firstImage(obj.photos) ??
         null;
 
       const rawLocation = decodeEntities(
