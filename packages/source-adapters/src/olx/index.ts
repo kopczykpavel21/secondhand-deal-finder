@@ -258,7 +258,8 @@ export class OlxAdapter extends BaseAdapter {
       const locationDate = metaLine.match(/([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]+)\s*-\s*([^|]+)/);
       const conditionText = this.extractConditionFromText(metaLine);
       const imageUrl = normalizeOlxUrl(
-        block.match(/<img[^>]+src="([^"]+)"/i)?.[1] ??
+        block.match(/<img[^>]+src="(https?:\/\/[^"]+)"/i)?.[1] ??
+        block.match(/<img[^>]+data-src="(https?:\/\/[^"]+)"/i)?.[1] ??
         block.match(/<img[^>]+srcset="([^"\s,]+)[^"]*"/i)?.[1] ??
         null
       );
