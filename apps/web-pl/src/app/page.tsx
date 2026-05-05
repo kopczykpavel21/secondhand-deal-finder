@@ -36,7 +36,7 @@ function saveDismissed(ids: Set<string>) {
 
 export default function HomePage() {
   const { state, search } = useSearch();
-  const [filters, setFilters] = useState<SearchFilters>({ sortBy: 'best_deal' });
+  const [filters, setFilters] = useState<SearchFilters>({ sortBy: 'most_relevant' });
   const [currentQuery, setCurrentQuery] = useState('');
   const [debugMode, setDebugMode] = useState(false);
   const [page, setPage] = useState(0);
