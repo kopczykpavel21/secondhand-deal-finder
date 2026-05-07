@@ -3,111 +3,27 @@ import { getMarketConfig } from '@sdf/types';
 import { BaseAdapter } from '../base-adapter';
 
 const BASE_URL = 'https://www.olx.pl';
-const MONTHS_PL: Record<string, number> = {
-  stycznia: 0,
-  lutego: 1,
-  marca: 2,
-  kwietnia: 3,
-  maja: 4,
-  czerwca: 5,
-  lipca: 6,
-  sierpnia: 7,
-  wrzesnia: 8,
-  września: 8,
-  pazdziernika: 9,
-  października: 9,
-  listopada: 10,
-  grudnia: 11,
-};
-
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
-}
-
-function stripTags(value: string): string {
-  return decodeEntities(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
-}
+const API_URL = 'https://www.olx.pl/api/v1';
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-function normalizeOlxUrl(value: string | null): string | null {
-  if (!value) return null;
-  const normalized = decodeEntities(value)
-    .replace(/\\\//g, '/')
-    .replace(/^http:\/\//i, 'https://')
-    .trim();
-  if (normalized.startsWith('//')) return `https:${normalized}`;
-  if (normalized.startsWith('/')) return `${BASE_URL}${normalized}`;
-  return normalized;
+function asNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value.replace(/[^\d.]/g, ''));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+  return null;
 }
 
-function extractPrice(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value !== 'string') return null;
-  const cleaned = value.replace(/[^\d,.]/g, '').replace(',', '.');
-  const parsed = parseFloat(cleaned);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-function firstImage(value: unknown): string | null {
-  if (typeof value === 'string') return normalizeOlxUrl(value);
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = firstImage(item);
-      if (found) return found;
-    }
-    return null;
-  }
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  return normalizeOlxUrl(
-    asString(record.link) ??
-    asString(record.url) ??
-    asString(record.src) ??
-    asString(record.imageUrl) ??
-    firstImage(record.thumbnail)
-  );
-}
-
-function extractStructuredObjects(html: string): Record<string, unknown>[] {
-  const blocks = [
-    ...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-    ...html.matchAll(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/gi),
-  ];
-
-  const out: Record<string, unknown>[] = [];
-
-  function visit(value: unknown, depth = 0) {
-    if (depth > 6 || value == null) return;
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item, depth + 1);
-      return;
-    }
-    if (typeof value !== 'object') return;
-
-    const record = value as Record<string, unknown>;
-    out.push(record);
-    for (const nested of Object.values(record)) visit(nested, depth + 1);
-  }
-
-  for (const block of blocks) {
-    try {
-      visit(JSON.parse(block[1]));
-    } catch {
-      // Ignore malformed structured payloads.
-    }
-  }
-
-  return out;
+function extractPhotoUrl(photos: unknown): string | null {
+  if (!Array.isArray(photos) || photos.length === 0) return null;
+  const first = photos[0] as Record<string, unknown>;
+  // OLX API returns photos as [{link: "...", ...}]
+  const link = asString(first.link) ?? asString(first.url) ?? asString(first.src);
+  return link;
 }
 
 export class OlxAdapter extends BaseAdapter {
@@ -119,13 +35,15 @@ export class OlxAdapter extends BaseAdapter {
   }
 
   buildSearchUrl(query: string, filters?: SearchFilters): string {
-    const slug = encodeURIComponent(query.trim());
-    const params = new URLSearchParams();
-    if (filters?.priceMin != null) params.set('search[filter_float_price:from]', String(filters.priceMin));
-    if (filters?.priceMax != null) params.set('search[filter_float_price:to]', String(filters.priceMax));
-    if (filters?.location) params.set('search[city_id]', filters.location);
-    params.set('search[order]', 'created_at:desc');
-    return `${BASE_URL}/oferty/q-${slug}/?${params.toString()}`;
+    const params = new URLSearchParams({
+      query: query.trim(),
+      limit: '40',
+      sort_by: 'created_at:desc',
+      currency: 'PLN',
+    });
+    if (filters?.priceMin != null) params.set('filter_float_price:from', String(filters.priceMin));
+    if (filters?.priceMax != null) params.set('filter_float_price:to', String(filters.priceMax));
+    return `${API_URL}/offers/?${params.toString()}`;
   }
 
   async searchListings(query: string, filters?: SearchFilters): Promise<NormalizedListing[]> {
@@ -134,14 +52,16 @@ export class OlxAdapter extends BaseAdapter {
 
   private async fetchListings(query: string, filters?: SearchFilters): Promise<NormalizedListing[]> {
     const url = this.buildSearchUrl(query, filters);
-    this.log(`Fetching: ${url}`);
+    this.log(`Fetching API: ${url}`);
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': this.config.userAgent,
-        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
         'Accept-Language': 'pl-PL,pl;q=0.9,en;q=0.8',
-        'Cache-Control': 'no-cache',
+        'Referer': 'https://www.olx.pl/',
+        'Origin': 'https://www.olx.pl',
+        'x-platform': 'web',
       },
       signal: AbortSignal.timeout(this.config.timeout),
     });
@@ -150,204 +70,83 @@ export class OlxAdapter extends BaseAdapter {
       throw new Error(`OLX HTTP ${response.status}`);
     }
 
-    const html = await response.text();
-    const structured = this.parseStructured(html);
-    if (structured.length > 0) {
-      this.log(`Structured parse returned ${structured.length} listings`);
-      return structured;
+    const json = (await response.json()) as Record<string, unknown>;
+    const data = json.data;
+    if (!Array.isArray(data)) {
+      this.log('OLX API returned unexpected shape');
+      return [];
     }
 
-    const fallback = this.parseFallback(html);
-    this.log(`Fallback parse returned ${fallback.length} listings`);
-    return fallback;
+    this.log(`OLX API returned ${data.length} items`);
+    return data.flatMap((item) => this.normalizeItem(item as Record<string, unknown>));
   }
 
-  private parseStructured(html: string): NormalizedListing[] {
-    const results: NormalizedListing[] = [];
-    const seen = new Set<string>();
+  private normalizeItem(item: Record<string, unknown>): NormalizedListing[] {
+    const id = asString(item.id) ?? asString(String(item.id));
+    const url = asString(item.url);
+    const title = asString(item.title);
+    if (!id || !url || !title) return [];
 
-    for (const obj of extractStructuredObjects(html)) {
-      const rawUrl = normalizeOlxUrl(asString(obj.url) ?? asString(obj.href) ?? asString(obj.link));
-      const title = decodeEntities(asString(obj.name) ?? asString(obj.title) ?? '');
-      if (!rawUrl || !title || !rawUrl.includes('/d/oferta/')) continue;
+    const params = item.params as Record<string, unknown>[] | undefined;
+    const priceParam = Array.isArray(params)
+      ? params.find((p) => (p as Record<string, unknown>).key === 'price')
+      : undefined;
+    const priceValue = (priceParam as Record<string, unknown> | undefined)?.value as Record<string, unknown> | undefined;
+    const price =
+      asNumber(priceValue?.value) ??
+      asNumber((item.price as Record<string, unknown> | undefined)?.value) ??
+      asNumber(item.price);
 
-      const listingId = this.extractListingId(rawUrl);
-      if (!listingId || seen.has(listingId)) continue;
-      seen.add(listingId);
+    const photos = item.photos as unknown;
+    const imageUrl = extractPhotoUrl(photos);
 
-      const offers = (obj.offers as Record<string, unknown> | undefined) ?? {};
-      const price =
-        extractPrice(offers.price) ??
-        extractPrice((offers.priceSpecification as Record<string, unknown> | undefined)?.price) ??
-        extractPrice(obj.price);
+    const locationObj = item.location as Record<string, unknown> | undefined;
+    const cityObj = locationObj?.city as Record<string, unknown> | undefined;
+    const location = asString(cityObj?.name) ?? asString(locationObj?.city) ?? asString(item.location) ?? null;
 
-      const imageUrl =
-        firstImage(obj.image) ??
-        firstImage(obj.images) ??
-        firstImage(obj.photo) ??
-        firstImage(obj.photos) ??
-        null;
+    const postedAtStr = asString(item.created_time) ?? asString(item.last_refresh_time);
+    const postedAt = this.safeDate(postedAtStr);
 
-      const rawLocation = decodeEntities(
-        asString((obj.address as Record<string, unknown> | undefined)?.addressLocality) ??
-        asString(obj.location) ??
-        asString(obj.city) ??
-        ''
-      ) || null;
+    const categoryObj = item.category as Record<string, unknown> | undefined;
+    const description = asString((item.description as Record<string, unknown> | undefined)?.text) ?? null;
+    const conditionParam = Array.isArray(params)
+      ? params.find((p) => (p as Record<string, unknown>).key === 'state')
+      : undefined;
+    const conditionText = asString((conditionParam as Record<string, unknown> | undefined)?.value_name) ?? null;
 
-      const conditionText =
-        asString(obj.itemCondition) ??
-        asString(obj.condition) ??
-        this.extractConditionFromText(`${title} ${asString(obj.description) ?? ''}`);
+    const isPromoted = Boolean(item.promotion) || /promoted|top_ad/i.test(JSON.stringify(item.status ?? ''));
+    const shippingText = JSON.stringify(item.delivery ?? '');
 
-      const shippingText = `${asString(obj.description) ?? ''} ${asString(obj.shipping) ?? ''}`;
+    const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
 
-      results.push({
-        id: this.makeId(listingId),
-        source: 'olx',
-        sourceListingId: listingId,
-        url: rawUrl.startsWith('http') ? rawUrl : `${BASE_URL}${rawUrl}`,
-        title,
-        description: decodeEntities(asString(obj.description) ?? '') || null,
-        price,
-        currency: 'PLN',
-        location: rawLocation,
-        postedAt:
-          this.parsePostedAt(asString(obj.datePosted) ?? asString(obj.dateCreated)) ??
-          this.parsePostedAt(asString(obj.validFrom)),
-        conditionText,
-        condition: this.inferCondition(conditionText),
-        imageCount: imageUrl ? 1 : 0,
-        imageUrl,
-        sellerName: null,
-        sellerRating: null,
-        sellerReviewCount: null,
-        views: null,
-        likes: null,
-        shippingAvailable: /przesyłk|wysyłk|dostaw/i.test(shippingText),
-        promoted: this.detectPromoted(obj),
-        rawMetadata: obj,
-      });
-    }
-
-    return results;
-  }
-
-  private parseFallback(html: string): NormalizedListing[] {
-    const hrefMatches = [...html.matchAll(/href="(\/d\/oferta\/[^"]+|https:\/\/www\.olx\.pl\/d\/oferta\/[^"]+)"/gi)];
-    const results: NormalizedListing[] = [];
-    const seen = new Set<string>();
-
-    for (const match of hrefMatches) {
-      const href = match[1];
-      const listingId = this.extractListingId(href);
-      if (!listingId || seen.has(listingId)) continue;
-      seen.add(listingId);
-
-      const idx = match.index ?? 0;
-      const block = html.slice(Math.max(0, idx - 250), Math.min(html.length, idx + 1400));
-      const title =
-        stripTags(block.match(/aria-label="([^"]{4,180})"/i)?.[1] ?? '') ||
-        stripTags(block.match(/<h[2-6][^>]*>([\s\S]*?)<\/h[2-6]>/i)?.[1] ?? '') ||
-        stripTags(block.match(/<a[^>]*>([\s\S]{4,220}?)<\/a>/i)?.[1] ?? '');
-
-      if (!title) continue;
-
-      const price = extractPrice(block.match(/(\d[\d\s,.]*)\s*zł/i)?.[0] ?? null);
-      const metaLine = stripTags(block);
-      const locationDate = metaLine.match(/([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]+)\s*-\s*([^|]+)/);
-      const conditionText = this.extractConditionFromText(metaLine);
-      const imageUrl = normalizeOlxUrl(
-        block.match(/<img[^>]+src="(https?:\/\/[^"]+)"/i)?.[1] ??
-        block.match(/<img[^>]+data-src="(https?:\/\/[^"]+)"/i)?.[1] ??
-        block.match(/<img[^>]+srcset="([^"\s,]+)[^"]*"/i)?.[1] ??
-        null
-      );
-
-      results.push({
-        id: this.makeId(listingId),
-        source: 'olx',
-        sourceListingId: listingId,
-        url: href.startsWith('http') ? href : `${BASE_URL}${href}`,
-        title,
-        description: null,
-        price,
-        currency: 'PLN',
-        location: locationDate?.[1]?.trim() ?? null,
-        postedAt: this.parsePostedAt(locationDate?.[2]?.trim() ?? null),
-        conditionText,
-        condition: this.inferCondition(conditionText),
-        imageCount: imageUrl ? 1 : 0,
-        imageUrl,
-        sellerName: null,
-        sellerRating: null,
-        sellerReviewCount: null,
-        views: null,
-        likes: null,
-        shippingAvailable: /przesyłk|wysyłk|dostaw/i.test(metaLine),
-        promoted: /promowan/i.test(metaLine),
-        rawMetadata: { excerpt: metaLine.slice(0, 500) },
-      });
-    }
-
-    return results;
-  }
-
-  private extractListingId(url: string): string | null {
-    const match = url.match(/-ID([A-Za-z0-9]+)\.html/i) ?? url.match(/\/([^/?#]+)\.html/i);
-    return match?.[1] ?? null;
-  }
-
-  private extractConditionFromText(text: string): string | null {
-    const lower = text.toLowerCase();
-    if (/nowy|nowa|nowe/.test(lower)) return 'nowy';
-    if (/bardzo dobry|jak nowy/.test(lower)) return 'bardzo dobry';
-    if (/używany|uzywany|dobry stan/.test(lower)) return 'używany';
-    if (/uszkodzony|na części|na czesci|do naprawy/.test(lower)) return 'uszkodzony';
-    return null;
-  }
-
-  private parsePostedAt(text: string | null): Date | null {
-    if (!text) return null;
-
-    const relative = this.parseRelativeDate(text);
-    if (relative) return relative;
-
-    const lower = text.toLowerCase();
-    const time = lower.match(/(\d{1,2}):(\d{2})/);
-
-    if (/dzisiaj/.test(lower)) {
-      const now = new Date();
-      if (time) now.setHours(Number(time[1]), Number(time[2]), 0, 0);
-      return now;
-    }
-
-    if (/wczoraj/.test(lower)) {
-      const yesterday = new Date(Date.now() - 86_400_000);
-      if (time) yesterday.setHours(Number(time[1]), Number(time[2]), 0, 0);
-      return yesterday;
-    }
-
-    const absolute = lower.match(/(\d{1,2})\s+([a-ząćęłńóśźż]+)\s+(\d{4})(?:,\s*(\d{1,2}):(\d{2}))?/i);
-    if (absolute) {
-      const month = MONTHS_PL[absolute[2]];
-      if (month != null) {
-        return new Date(
-          Number(absolute[3]),
-          month,
-          Number(absolute[1]),
-          Number(absolute[4] ?? 0),
-          Number(absolute[5] ?? 0),
-        );
-      }
-    }
-
-    return this.safeDate(text);
+    return [{
+      id: this.makeId(id),
+      source: 'olx',
+      sourceListingId: id,
+      url: fullUrl,
+      title,
+      description,
+      price,
+      currency: 'PLN',
+      location,
+      postedAt,
+      conditionText,
+      condition: this.inferCondition(conditionText),
+      imageCount: Array.isArray(photos) ? photos.length : (imageUrl ? 1 : 0),
+      imageUrl,
+      sellerName: asString((item.user as Record<string, unknown> | undefined)?.name) ?? null,
+      sellerRating: null,
+      sellerReviewCount: null,
+      views: null,
+      likes: null,
+      shippingAvailable: /courier|dostawa|wysyłk|przesyłk/i.test(shippingText),
+      promoted: isPromoted,
+      rawMetadata: { id, category: categoryObj?.id },
+    }];
   }
 
   detectPromoted(raw: Record<string, unknown>): boolean {
-    const joined = JSON.stringify(raw);
-    return /promowan/i.test(joined);
+    return /promoted|top_ad/i.test(JSON.stringify(raw));
   }
 
   extractSellerSignals(_raw: Record<string, unknown>) {
