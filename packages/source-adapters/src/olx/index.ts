@@ -19,11 +19,25 @@ function asNumber(value: unknown): number | null {
 }
 
 function extractPhotoUrl(photos: unknown): string | null {
+  // Direct string URL
+  if (typeof photos === 'string' && photos.startsWith('http')) return cleanCdnUrl(photos);
   if (!Array.isArray(photos) || photos.length === 0) return null;
-  const first = photos[0] as Record<string, unknown>;
-  // OLX API returns photos as [{link: "...", ...}]
-  const link = asString(first.link) ?? asString(first.url) ?? asString(first.src);
-  return link;
+  const first = photos[0];
+  // Array of strings
+  if (typeof first === 'string' && first.startsWith('http')) return cleanCdnUrl(first);
+  // Array of objects
+  if (first && typeof first === 'object') {
+    const obj = first as Record<string, unknown>;
+    const raw = asString(obj.link) ?? asString(obj.url) ?? asString(obj.src) ??
+      asString(obj.href) ?? asString(obj.imageUrl) ?? asString(obj.image);
+    return raw ? cleanCdnUrl(raw) : null;
+  }
+  return null;
+}
+
+function cleanCdnUrl(url: string): string {
+  // Remove explicit :443 port (redundant for https, and some proxies choke on it)
+  return url.replace(/^(https:\/\/[^/:]+):443\//, '$1/');
 }
 
 export class OlxAdapter extends BaseAdapter {
@@ -78,6 +92,11 @@ export class OlxAdapter extends BaseAdapter {
     }
 
     this.log(`OLX API returned ${data.length} items`);
+    if (data.length > 0) {
+      const sample = data[0] as Record<string, unknown>;
+      this.log(`OLX sample keys: ${Object.keys(sample).join(', ')}`);
+      this.log(`OLX sample photos: ${JSON.stringify(sample.photos).slice(0, 300)}`);
+    }
     return data.flatMap((item) => this.normalizeItem(item as Record<string, unknown>));
   }
 
@@ -141,7 +160,7 @@ export class OlxAdapter extends BaseAdapter {
       likes: null,
       shippingAvailable: /courier|dostawa|wysyłk|przesyłk/i.test(shippingText),
       promoted: isPromoted,
-      rawMetadata: { id, category: categoryObj?.id },
+      rawMetadata: { id, category: categoryObj?.id, _photos: photos },
     }];
   }
 
