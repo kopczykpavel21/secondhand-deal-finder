@@ -1,6 +1,6 @@
 import type { Source } from './index';
 
-export type MarketId = 'cz' | 'pl' | 'de' | 'at';
+export type MarketId = 'cz' | 'pl' | 'de' | 'at' | 'gr';
 export type SourceBadge = 'full' | 'partial' | 'experimental';
 
 export interface RelativeDateRule {
@@ -336,6 +336,66 @@ export const atMarket: MarketConfig = {
   },
 };
 
+export const grMarket: MarketConfig = {
+  id: 'gr',
+  locale: 'el-GR',
+  currency: 'EUR',
+  priceBucketSize: 50,
+  minPlausiblePrice: 3,
+  spamPatterns: [/whatsapp/i, /telegram/i, /call me/i, /viber/i],
+  stopwords: [],
+  accessoryHeadNouns: [],
+  forPrepositions: [],
+  conditionSignals: {
+    new: ['καινούριο', 'καινούρια', 'αχρησιμοποίητο', 'νέο'],
+    like_new: ['σαν καινούριο', 'άριστη κατάσταση', 'σχεδόν καινούριο'],
+    good: ['καλή κατάσταση', 'πολύ καλή', 'λίγο μεταχειρισμένο'],
+    fair: ['μεταχειρισμένο', 'σημάδια χρήσης', 'χρησιμοποιημένο'],
+    poor: ['χαλασμένο', 'για ανταλλακτικά', 'προς επισκευή', 'σπασμένο'],
+  },
+  relativeDateRules: [
+    { pattern: /πριν (\d+) λεπτ/i, unitMs: 60_000 },
+    { pattern: /πριν (\d+) ώρ/i, unitMs: 3_600_000 },
+    { pattern: /πριν μία ώρα/i, unitMs: 3_600_000, defaultValue: 1 },
+    { pattern: /χθες/i, unitMs: 86_400_000, defaultValue: 1 },
+    { pattern: /πριν (\d+) μέρ/i, unitMs: 86_400_000 },
+    { pattern: /πριν (\d+) εβδομάδ/i, unitMs: 604_800_000 },
+  ],
+  sourceOptions: [
+    { id: 'vinted', label: 'Vinted', badge: 'full' },
+    { id: 'facebook', label: 'Facebook', badge: 'partial' },
+    { id: 'shpock', label: 'Shpock', badge: 'partial' },
+  ],
+  sourceLabels: {
+    vinted: 'Vinted',
+    facebook: 'Facebook',
+    shpock: 'Shpock',
+    mock: 'Demo',
+  },
+  searchSuggestions: [
+    'iPhone 13 128GB',
+    'ποδήλατο',
+    'χειμωνιάτικο μπουφάν',
+    'MacBook Pro',
+    'PlayStation 5',
+    'παιδικό καροτσάκι',
+  ],
+  texts: {
+    appName: 'Secondhand Finder Ελλάδα',
+    title: 'Secondhand Finder Ελλάδα',
+    description: 'Βρες τις καλύτερες μεταχειρισμένες προσφορές σε Vinted, Facebook και Shpock. Ταξινομημένες κατά πραγματική αξία.',
+    heroBadge: 'Beta · Vinted · Facebook · Shpock',
+    tagline: 'Βρες τις καλύτερες προσφορές σε Vinted, Facebook και Shpock – ταξινομημένες κατά πραγματική αξία.',
+    searchPlaceholder: 'Τι ψάχνεις; π.χ. iPhone 13, ποδήλατο, μπουφάν…',
+    emptyStateTitle: 'Τι ψάχνεις;',
+    emptyStateBody: 'Ψάχνουμε σε Vinted, Facebook και Shpock ταυτόχρονα.',
+    noResultsTitle: 'Δεν βρέθηκαν αποτελέσματα',
+    noResultsBody: 'Δοκίμασε διαφορετικές λέξεις-κλειδιά ή άλλαξε τα φίλτρα.',
+    feedbackButton: 'Σχόλια',
+    footer: 'Secondhand Finder Ελλάδα · Beta · Δεδομένα από τρίτες υπηρεσίες, μόνο για ενημέρωση',
+  },
+};
+
 export function getMarketConfig(id: MarketId): MarketConfig {
   switch (id) {
     case 'pl':
@@ -344,6 +404,8 @@ export function getMarketConfig(id: MarketId): MarketConfig {
       return atMarket;
     case 'de':
       return deMarket;
+    case 'gr':
+      return grMarket;
     case 'cz':
     default:
       return czMarket;

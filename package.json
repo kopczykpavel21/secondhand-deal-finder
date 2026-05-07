@@ -14,6 +14,8 @@
     "dev:worker:de": "npm run dev --workspace=apps/worker-de",
     "dev:at": "npm run dev --workspace=apps/web-at",
     "dev:worker:at": "npm run dev --workspace=apps/worker-at",
+    "dev:gr": "npm run dev --workspace=apps/web-gr",
+    "dev:worker:gr": "npm run dev --workspace=apps/worker-gr",
     "build": "npm run build --workspace=apps/web",
     "build:worker:cz": "npm run build --workspace=apps/worker-cz",
     "build:pl": "npm run build --workspace=apps/web-pl",
@@ -22,6 +24,8 @@
     "build:worker:de": "npm run build --workspace=apps/worker-de",
     "build:at": "npm run build --workspace=apps/web-at",
     "build:worker:at": "npm run build --workspace=apps/worker-at",
+    "build:gr": "npm run build --workspace=apps/web-gr",
+    "build:worker:gr": "npm run build --workspace=apps/worker-gr",
     "lint": "npm run lint --workspace=apps/web",
     "lint:pl": "npm run lint --workspace=apps/web-pl"
   },
