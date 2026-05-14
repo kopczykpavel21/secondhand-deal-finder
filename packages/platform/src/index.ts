@@ -22,6 +22,7 @@ export {
   buildCzechAdapters,
   buildGermanAdapters,
   buildPolishAdapters,
+  buildRomanianAdapters,
   buildSlovakAdapters,
   createAustriaSearchCoordinator,
   createCzechSearchCoordinator,
@@ -31,7 +32,9 @@ export {
   createProductionCzechSearchCoordinator,
   createProductionGermanSearchCoordinator,
   createProductionPolishSearchCoordinator,
+  createProductionRomanianSearchCoordinator,
   createProductionSlovakSearchCoordinator,
+  createRomanianSearchCoordinator,
   createSlovakSearchCoordinator,
 } from './polish-search';
 export {

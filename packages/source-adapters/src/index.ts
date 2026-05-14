@@ -11,5 +11,6 @@ export { WillhabenAdapter } from './willhaben';
 export { KleinanzeigeAdapter } from './kleinanzeigen';
 export { ShpockAdapter } from './shpock';
 export { OlxAdapter } from './olx';
+export { OlxRoAdapter } from './olx-ro';
 export { AllegroLokalnieAdapter } from './allegro-lokalnie';
 export { SprzedajemyAdapter } from './sprzedajemy';

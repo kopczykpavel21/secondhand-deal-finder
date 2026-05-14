@@ -1,4 +1,4 @@
-import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
+import type { AdapterConfig, NormalizedListing, SearchFilters, Source } from '@sdf/types';
 import { getMarketConfig } from '@sdf/types';
 import { BaseAdapter } from '../base-adapter';
 
@@ -19,6 +19,18 @@ const MONTHS_PL: Record<string, number> = {
   listopada: 10,
   grudnia: 11,
 };
+
+export interface OlxAdapterOptions {
+  source?: Source;
+  baseUrl?: string;
+  currency?: string;
+  searchPath?: string;
+  listingUrlFragment?: string;
+  shippingPattern?: RegExp;
+  promotedPattern?: RegExp;
+  acceptLanguage?: string;
+  monthNames?: Record<string, number>;
+}
 
 function decodeEntities(value: string): string {
   return value
@@ -110,11 +122,29 @@ function extractStructuredObjects(html: string): Record<string, unknown>[] {
 }
 
 export class OlxAdapter extends BaseAdapter {
-  source = 'olx' as const;
+  readonly source: Source;
   supportLevel = 'full' as const;
 
-  constructor(config: Partial<AdapterConfig> = {}) {
+  protected readonly olxBaseUrl: string;
+  protected readonly olxCurrency: string;
+  protected readonly olxSearchPath: string;
+  protected readonly olxListingFragment: string;
+  protected readonly olxShippingPattern: RegExp;
+  protected readonly olxPromotedPattern: RegExp;
+  protected readonly olxAcceptLanguage: string;
+  protected readonly olxMonthNames: Record<string, number>;
+
+  constructor(config: Partial<AdapterConfig> = {}, options: OlxAdapterOptions = {}) {
     super({ timeout: 15_000, rateLimitMs: 1_000, retries: 1, ...config }, getMarketConfig('pl'));
+    this.source = options.source ?? 'olx';
+    this.olxBaseUrl = options.baseUrl ?? BASE_URL;
+    this.olxCurrency = options.currency ?? 'PLN';
+    this.olxSearchPath = options.searchPath ?? 'oferty';
+    this.olxListingFragment = options.listingUrlFragment ?? '/d/oferta/';
+    this.olxShippingPattern = options.shippingPattern ?? /przesyłk|wysyłk|dostaw/i;
+    this.olxPromotedPattern = options.promotedPattern ?? /promowan/i;
+    this.olxAcceptLanguage = options.acceptLanguage ?? 'pl-PL,pl;q=0.9,en;q=0.8';
+    this.olxMonthNames = options.monthNames ?? MONTHS_PL;
   }
 
   buildSearchUrl(query: string, filters?: SearchFilters): string {
@@ -124,7 +154,7 @@ export class OlxAdapter extends BaseAdapter {
     if (filters?.priceMax != null) params.set('search[filter_float_price:to]', String(filters.priceMax));
     if (filters?.location) params.set('search[city_id]', filters.location);
     params.set('search[order]', 'created_at:desc');
-    return `${BASE_URL}/oferty/q-${slug}/?${params.toString()}`;
+    return `${this.olxBaseUrl}/${this.olxSearchPath}/q-${slug}/?${params.toString()}`;
   }
 
   async searchListings(query: string, filters?: SearchFilters): Promise<NormalizedListing[]> {
@@ -139,7 +169,7 @@ export class OlxAdapter extends BaseAdapter {
       headers: {
         'User-Agent': this.config.userAgent,
         'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'pl-PL,pl;q=0.9,en;q=0.8',
+        'Accept-Language': this.olxAcceptLanguage,
         'Cache-Control': 'no-cache',
       },
       signal: AbortSignal.timeout(this.config.timeout),
@@ -168,7 +198,7 @@ export class OlxAdapter extends BaseAdapter {
     for (const obj of extractStructuredObjects(html)) {
       const rawUrl = normalizeOlxUrl(asString(obj.url) ?? asString(obj.href) ?? asString(obj.link));
       const title = decodeEntities(asString(obj.name) ?? asString(obj.title) ?? '');
-      if (!rawUrl || !title || !rawUrl.includes('/d/oferta/')) continue;
+      if (!rawUrl || !title || !rawUrl.includes(this.olxListingFragment)) continue;
 
       const listingId = this.extractListingId(rawUrl);
       if (!listingId || seen.has(listingId)) continue;
@@ -202,13 +232,13 @@ export class OlxAdapter extends BaseAdapter {
 
       results.push({
         id: this.makeId(listingId),
-        source: 'olx',
+        source: this.source,
         sourceListingId: listingId,
-        url: rawUrl.startsWith('http') ? rawUrl : `${BASE_URL}${rawUrl}`,
+        url: rawUrl.startsWith('http') ? rawUrl : `${this.olxBaseUrl}${rawUrl}`,
         title,
         description: decodeEntities(asString(obj.description) ?? '') || null,
         price,
-        currency: 'PLN',
+        currency: this.olxCurrency,
         location: rawLocation,
         postedAt:
           this.parsePostedAt(asString(obj.datePosted) ?? asString(obj.dateCreated)) ??
@@ -222,7 +252,7 @@ export class OlxAdapter extends BaseAdapter {
         sellerReviewCount: null,
         views: null,
         likes: null,
-        shippingAvailable: /przesyłk|wysyłk|dostaw/i.test(shippingText),
+        shippingAvailable: this.olxShippingPattern.test(shippingText),
         promoted: this.detectPromoted(obj),
         rawMetadata: obj,
       });
@@ -232,7 +262,10 @@ export class OlxAdapter extends BaseAdapter {
   }
 
   private parseFallback(html: string): NormalizedListing[] {
-    const hrefMatches = [...html.matchAll(/href="(\/d\/oferta\/[^"]+|https:\/\/www\.olx\.pl\/d\/oferta\/[^"]+)"/gi)];
+    const frag = this.olxListingFragment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const domainEsc = this.olxBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const hrefPattern = new RegExp(`href="(${frag}[^"]+|${domainEsc}${frag}[^"]+)"`, 'gi');
+    const hrefMatches = [...html.matchAll(hrefPattern)];
     const results: NormalizedListing[] = [];
     const seen = new Set<string>();
 
@@ -251,7 +284,7 @@ export class OlxAdapter extends BaseAdapter {
 
       if (!title) continue;
 
-      const price = extractPrice(block.match(/(\d[\d\s,.]*)\s*zł/i)?.[0] ?? null);
+      const price = extractPrice(block.match(/(\d[\d\s,.]*)[\s]*(zł|lei|€|kr|ft|£)/i)?.[0] ?? null);
       const metaLine = stripTags(block);
       const locationDate = metaLine.match(/([A-ZĄĆĘŁŃÓŚŹŻ][A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż .-]+)\s*-\s*([^|]+)/);
       const conditionText = this.extractConditionFromText(metaLine);
@@ -263,13 +296,13 @@ export class OlxAdapter extends BaseAdapter {
 
       results.push({
         id: this.makeId(listingId),
-        source: 'olx',
+        source: this.source,
         sourceListingId: listingId,
-        url: href.startsWith('http') ? href : `${BASE_URL}${href}`,
+        url: href.startsWith('http') ? href : `${this.olxBaseUrl}${href}`,
         title,
         description: null,
         price,
-        currency: 'PLN',
+        currency: this.olxCurrency,
         location: locationDate?.[1]?.trim() ?? null,
         postedAt: this.parsePostedAt(locationDate?.[2]?.trim() ?? null),
         conditionText,
@@ -281,8 +314,8 @@ export class OlxAdapter extends BaseAdapter {
         sellerReviewCount: null,
         views: null,
         likes: null,
-        shippingAvailable: /przesyłk|wysyłk|dostaw/i.test(metaLine),
-        promoted: /promowan/i.test(metaLine),
+        shippingAvailable: this.olxShippingPattern.test(metaLine),
+        promoted: this.olxPromotedPattern.test(metaLine),
         rawMetadata: { excerpt: metaLine.slice(0, 500) },
       });
     }
@@ -327,7 +360,7 @@ export class OlxAdapter extends BaseAdapter {
 
     const absolute = lower.match(/(\d{1,2})\s+([a-ząćęłńóśźż]+)\s+(\d{4})(?:,\s*(\d{1,2}):(\d{2}))?/i);
     if (absolute) {
-      const month = MONTHS_PL[absolute[2]];
+      const month = this.olxMonthNames[absolute[2]];
       if (month != null) {
         return new Date(
           Number(absolute[3]),
@@ -344,7 +377,7 @@ export class OlxAdapter extends BaseAdapter {
 
   detectPromoted(raw: Record<string, unknown>): boolean {
     const joined = JSON.stringify(raw);
-    return /promowan/i.test(joined);
+    return this.olxPromotedPattern.test(joined);
   }
 
   extractSellerSignals(_raw: Record<string, unknown>) {

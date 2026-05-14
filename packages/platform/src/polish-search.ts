@@ -9,6 +9,7 @@ import {
   KleinanzeigeAdapter,
   MockAdapter,
   OlxAdapter,
+  OlxRoAdapter,
   SbazarAdapter,
   ShpockAdapter,
   SprzedajemyAdapter,
@@ -129,6 +130,42 @@ export function createAustriaSearchCoordinator(options: {
 
 export function createProductionAustriaSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
   return createAustriaSearchCoordinator({
+    cache: cache ?? null,
+    limiter: createSourceConcurrencyLimiter(),
+  });
+}
+
+export function buildRomanianAdapters(options: {
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SourceAdapter[] {
+  if (process.env.USE_MOCK_ADAPTERS === 'true') {
+    return [new MockAdapter()];
+  }
+
+  const adapters: SourceAdapter[] = [new OlxRoAdapter()];
+  if (process.env.ENABLE_VINTED !== 'false') {
+    adapters.push(new VintedAdapter({
+      baseUrl: 'https://www.vinted.ro',
+      marketConfig: getMarketConfig('ro'),
+    }));
+  }
+
+  if (!options.limiter) return adapters;
+  return adapters.map((adapter) => throttleAdapter(adapter, options.limiter!));
+}
+
+export function createRomanianSearchCoordinator(options: {
+  cache?: SearchCache | null;
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SearchCoordinator {
+  return new SearchCoordinator(
+    buildRomanianAdapters({ limiter: options.limiter }),
+    { marketConfig: getMarketConfig('ro'), cache: options.cache ?? null, cacheNamespace: 'ro' },
+  );
+}
+
+export function createProductionRomanianSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
+  return createRomanianSearchCoordinator({
     cache: cache ?? null,
     limiter: createSourceConcurrencyLimiter(),
   });

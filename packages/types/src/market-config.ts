@@ -403,6 +403,69 @@ export const skMarket: MarketConfig = {
   },
 };
 
+export const roMarket: MarketConfig = {
+  id: 'ro',
+  locale: 'ro-RO',
+  currency: 'RON',
+  priceBucketSize: 500,
+  minPlausiblePrice: 5,
+  spamPatterns: [
+    /\btel\.?\s*[:.]?\s*\d{9,}/i,
+    /whatsapp/i,
+    /telegram/i,
+    /call me/i,
+  ],
+  stopwords: [],
+  accessoryHeadNouns: [],
+  forPrepositions: [],
+  conditionSignals: {
+    new: ['nou', 'nouă', 'sigilat', 'nefolosit', 'nefolosită'],
+    like_new: ['ca nou', 'ca nouă', 'stare foarte bună', 'impecabil'],
+    good: ['stare bună', 'funcțional', 'îngrijit', 'folosit puțin'],
+    fair: ['urme de utilizare', 'zgârieturi', 'uzat'],
+    poor: ['defect', 'nefuncțional', 'pentru piese', 'pentru reparație', 'spart'],
+  },
+  relativeDateRules: [
+    { pattern: /acum (\d+) minute/i, unitMs: 60_000 },
+    { pattern: /acum (\d+) ore/i, unitMs: 3_600_000 },
+    { pattern: /acum o oră/i, unitMs: 3_600_000, defaultValue: 1 },
+    { pattern: /acum (\d+) zile/i, unitMs: 86_400_000 },
+    { pattern: /ieri/i, unitMs: 86_400_000, defaultValue: 1 },
+    { pattern: /acum (\d+) săptămâni/i, unitMs: 604_800_000 },
+  ],
+  sourceOptions: [
+    { id: 'olx_ro', label: 'OLX.ro', badge: 'full' },
+    { id: 'vinted', label: 'Vinted', badge: 'partial' },
+  ],
+  sourceLabels: {
+    olx_ro: 'OLX.ro',
+    vinted: 'Vinted',
+    mock: 'Demo',
+  },
+  searchSuggestions: [
+    'iPhone 13 128GB',
+    'bicicletă munte',
+    'geacă de iarnă',
+    'MacBook Pro',
+    'PlayStation 5',
+    'cărucior copil',
+  ],
+  texts: {
+    appName: 'La Mâna a Doua',
+    title: 'La Mâna a Doua – oferte second hand',
+    description: 'Găsim cele mai bune oferte second hand pe OLX și Vinted și le ordonăm după valoarea reală.',
+    heroBadge: 'Beta · OLX.ro · Vinted',
+    tagline: 'Găsim cele mai bune oferte pe OLX și Vinted și le ordonăm după valoarea reală.',
+    searchPlaceholder: 'Ce căutați? Ex. iPhone 13, bicicletă, geacă de iarnă...',
+    emptyStateTitle: 'Scrieți ce căutați',
+    emptyStateBody: 'Căutăm pe OLX.ro și Vinted simultan.',
+    noResultsTitle: 'Niciun rezultat',
+    noResultsBody: 'Încercați alt cuvânt cheie sau modificați filtrele.',
+    feedbackButton: 'Feedback',
+    footer: 'La Mâna a Doua · Beta · Date de la terți, doar cu titlu informativ',
+  },
+};
+
 export function getMarketConfig(id: MarketId): MarketConfig {
   switch (id) {
     case 'pl':
@@ -413,6 +476,8 @@ export function getMarketConfig(id: MarketId): MarketConfig {
       return deMarket;
     case 'sk':
       return skMarket;
+    case 'ro':
+      return roMarket;
     case 'cz':
     default:
       return czMarket;
