@@ -22,14 +22,17 @@ export {
   buildCzechAdapters,
   buildGermanAdapters,
   buildPolishAdapters,
+  buildSlovakAdapters,
   createAustriaSearchCoordinator,
   createCzechSearchCoordinator,
   createGermanSearchCoordinator,
+  createPolishSearchCoordinator,
   createProductionAustriaSearchCoordinator,
   createProductionCzechSearchCoordinator,
   createProductionGermanSearchCoordinator,
-  createPolishSearchCoordinator,
   createProductionPolishSearchCoordinator,
+  createProductionSlovakSearchCoordinator,
+  createSlovakSearchCoordinator,
 } from './polish-search';
 export {
   appendSearchJobEvent,

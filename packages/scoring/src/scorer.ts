@@ -46,53 +46,54 @@ function buildExplanation(
 ): string[] {
   const lines: string[] = [];
   const isPolish = market.id === 'pl';
+  const isCzech = market.id === 'cz';
 
   if (components.relevance >= 0.8)
-    lines.push(isPolish ? 'Bardzo dobra zgodność z wyszukiwanym hasłem.' : 'Výborná shoda s hledaným výrazem.');
+    lines.push(isPolish ? 'Bardzo dobra zgodność z wyszukiwanym hasłem.' : isCzech ? 'Výborná shoda s hledaným výrazem.' : 'Excellent match for the search term.');
   else if (components.relevance < 0.4)
-    lines.push(isPolish ? 'Częściowa zgodność — brakuje części słów kluczowych.' : 'Částečná shoda — některá klíčová slova chybí.');
+    lines.push(isPolish ? 'Częściowa zgodność — brakuje części słów kluczowych.' : isCzech ? 'Částečná shoda — některá klíčová slova chybí.' : 'Partial match — some keywords are missing.');
 
   if (weights.valueForMoney === 0) {
-    lines.push(isPolish ? 'Cena nie była uwzględniona w ocenie.' : 'Cena nebyla při hodnocení zohledněna.');
+    lines.push(isPolish ? 'Cena nie była uwzględniona w ocenie.' : isCzech ? 'Cena nebyla při hodnocení zohledněna.' : 'Price was not factored into the score.');
   } else if (components.valueForMoney >= 0.7) {
-    lines.push(isPolish ? 'Cena jest poniżej mediany dla tego wyszukiwania — wygląda na okazję.' : 'Cena je pod mediánem pro toto hledání — výhodná koupě.');
+    lines.push(isPolish ? 'Cena jest poniżej mediany dla tego wyszukiwania — wygląda na okazję.' : isCzech ? 'Cena je pod mediánem pro toto hledání — výhodná koupě.' : 'Price is below the median for this search — looks like a deal.');
   } else if (components.valueForMoney <= 0.35) {
-    lines.push(isPolish ? 'Cena jest powyżej mediany podobnych ofert.' : 'Cena je nad mediánem podobných inzerátů.');
+    lines.push(isPolish ? 'Cena jest powyżej mediany podobnych ofert.' : isCzech ? 'Cena je nad mediánem podobných inzerátů.' : 'Price is above the median for similar listings.');
   } else {
-    lines.push(isPolish ? 'Cena jest zbliżona do średniej podobnych ofert.' : 'Cena odpovídá průměru podobných nabídek.');
+    lines.push(isPolish ? 'Cena jest zbliżona do średniej podobnych ofert.' : isCzech ? 'Cena odpovídá průměru podobných nabídek.' : 'Price is close to the average for similar listings.');
   }
 
   if (components.condition >= 0.8)
-    lines.push(isPolish ? 'Oferta wskazuje na nowy albo prawie nowy stan.' : 'Inzerát uvádí nový nebo skoro nový stav.');
+    lines.push(isPolish ? 'Oferta wskazuje na nowy albo prawie nowy stan.' : isCzech ? 'Inzerát uvádí nový nebo skoro nový stav.' : 'Listed as new or near-new condition.');
   else if (components.condition <= 0.2)
-    lines.push(isPolish ? 'Stan wygląda słabo albo przedmiot jest oferowany na części.' : 'Stav vypadá špatně nebo nabízeno na náhradní díly.');
+    lines.push(isPolish ? 'Stan wygląda słabo albo przedmiot jest oferowany na części.' : isCzech ? 'Stav vypadá špatně nebo nabízeno na náhradní díly.' : 'Condition looks poor or offered for parts.');
 
   if (listing.promoted)
-    lines.push(isPolish ? 'Świeżość jest neutralna — promowane oferty bywają odświeżane codziennie, więc prawdziwy wiek nie jest znany.' : 'Čerstvost je neutrální — topované inzeráty se obnovují každý den, skutečné stáří není známé.');
+    lines.push(isPolish ? 'Świeżość jest neutralna — promowane oferty bywają odświeżane codziennie, więc prawdziwy wiek nie jest znany.' : isCzech ? 'Čerstvost je neutrální — topované inzeráty se obnovují každý den, skutečné stáří není známé.' : 'Freshness is neutral — boosted listings are renewed daily, real age unknown.');
   else if (components.freshness >= 0.8)
-    lines.push(isPolish ? 'Oferta została dodana niedawno.' : 'Inzerát byl přidán nedávno.');
+    lines.push(isPolish ? 'Oferta została dodana niedawno.' : isCzech ? 'Inzerát byl přidán nedávno.' : 'Listing was added recently.');
   else if (components.freshness <= 0.2)
-    lines.push(isPolish ? 'Oferta jest starsza niż dwa tygodnie.' : 'Inzerát je starší než dva týdny.');
+    lines.push(isPolish ? 'Oferta jest starsza niż dwa tygodnie.' : isCzech ? 'Inzerát je starší než dva týdny.' : 'Listing is older than two weeks.');
 
   if (components.sellerTrust >= 0.75)
-    lines.push(isPolish ? 'Sprzedający ma wysoką ocenę i dobre opinie.' : 'Prodávající má vysoké hodnocení a dobré recenze.');
+    lines.push(isPolish ? 'Sprzedający ma wysoką ocenę i dobre opinie.' : isCzech ? 'Prodávající má vysoké hodnocení a dobré recenze.' : 'Seller has a high rating and good reviews.');
   else if (listing.sellerRating === null && listing.sellerReviewCount === null)
-    lines.push(isPolish ? 'Dla tego źródła nie ma danych o reputacji sprzedającego.' : 'Pro tento zdroj nejsou dostupná data o reputaci prodávajícího.');
+    lines.push(isPolish ? 'Dla tego źródła nie ma danych o reputacji sprzedającego.' : isCzech ? 'Pro tento zdroj nejsou dostupná data o reputaci prodávajícího.' : 'No seller reputation data available for this source.');
 
   if (components.spamPenalty < 0) {
     if (listing.price !== null && listing.price < market.minPlausiblePrice)
-      lines.push(isPolish ? 'Kara: cena jest nienaturalnie niska — możliwy placeholder albo oszustwo.' : 'Penalizace: cena je neuvěřitelně nízká — možný placeholder nebo podvod.');
+      lines.push(isPolish ? 'Kara: cena jest nienaturalnie niska — możliwy placeholder albo oszustwo.' : isCzech ? 'Penalizace: cena je neuvěřitelně nízká — možný placeholder nebo podvod.' : 'Penalty: price is suspiciously low — possible placeholder or scam.');
     else
-      lines.push(isPolish ? 'Kara: oferta wygląda jak spam albo wielokrotnie odświeżane ogłoszenie.' : 'Penalizace: inzerát odpovídá vzorům spamu nebo opakovaných vkladů.');
+      lines.push(isPolish ? 'Kara: oferta wygląda jak spam albo wielokrotnie odświeżane ogłoszenie.' : isCzech ? 'Penalizace: inzerát odpovídá vzorům spamu nebo opakovaných vkladů.' : 'Penalty: listing matches spam or repeated-posting patterns.');
   }
 
   if (components.engagement >= 0.75)
-    lines.push(isPolish ? 'Wysoka liczba wyświetleń względem wieku oferty.' : 'Vysoký počet zobrazení vzhledem ke stáří inzerátu.');
+    lines.push(isPolish ? 'Wysoka liczba wyświetleń względem wieku oferty.' : isCzech ? 'Vysoký počet zobrazení vzhledem ke stáří inzerátu.' : 'High view count relative to listing age.');
   else if (components.engagement <= 0.25 && listing.views !== null)
-    lines.push(isPolish ? 'Niska liczba wyświetleń względem wieku oferty.' : 'Nízký počet zobrazení vzhledem ke stáří inzerátu.');
+    lines.push(isPolish ? 'Niska liczba wyświetleń względem wieku oferty.' : isCzech ? 'Nízký počet zobrazení vzhledem ke stáří inzerátu.' : 'Low view count relative to listing age.');
 
   if (listing.shippingAvailable === true)
-    lines.push(isPolish ? 'Dostępna wysyłka.' : 'Možnost doručení.');
+    lines.push(isPolish ? 'Dostępna wysyłka.' : isCzech ? 'Možnost doručení.' : 'Shipping available.');
 
   return lines;
 }

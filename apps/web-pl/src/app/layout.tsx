@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     title: market.texts.title,
     description: market.texts.description,
     type: 'website',
-    locale: 'pl_PL',
+    locale: market.locale.replace('-', '_'),
   },
 };
 
@@ -34,7 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pl">
+    <html lang={market.locale.split('-')[0]}>
       <body className="min-h-screen">{children}</body>
     </html>
   );

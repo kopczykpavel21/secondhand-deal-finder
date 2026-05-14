@@ -4,6 +4,7 @@ import type { SourceAdapter } from '@sdf/types';
 import {
   AukroAdapter,
   BazosAdapter,
+  BazosSkAdapter,
   FlerAdapter,
   KleinanzeigeAdapter,
   MockAdapter,
@@ -128,6 +129,42 @@ export function createAustriaSearchCoordinator(options: {
 
 export function createProductionAustriaSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
   return createAustriaSearchCoordinator({
+    cache: cache ?? null,
+    limiter: createSourceConcurrencyLimiter(),
+  });
+}
+
+export function buildSlovakAdapters(options: {
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SourceAdapter[] {
+  if (process.env.USE_MOCK_ADAPTERS === 'true') {
+    return [new MockAdapter()];
+  }
+
+  const adapters: SourceAdapter[] = [new BazosSkAdapter()];
+  if (process.env.ENABLE_VINTED !== 'false') {
+    adapters.push(new VintedAdapter({
+      baseUrl: 'https://www.vinted.sk',
+      marketConfig: getMarketConfig('sk'),
+    }));
+  }
+
+  if (!options.limiter) return adapters;
+  return adapters.map((adapter) => throttleAdapter(adapter, options.limiter!));
+}
+
+export function createSlovakSearchCoordinator(options: {
+  cache?: SearchCache | null;
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SearchCoordinator {
+  return new SearchCoordinator(
+    buildSlovakAdapters({ limiter: options.limiter }),
+    { marketConfig: getMarketConfig('sk'), cache: options.cache ?? null, cacheNamespace: 'sk' },
+  );
+}
+
+export function createProductionSlovakSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
+  return createSlovakSearchCoordinator({
     cache: cache ?? null,
     limiter: createSourceConcurrencyLimiter(),
   });

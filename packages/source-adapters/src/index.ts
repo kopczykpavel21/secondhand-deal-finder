@@ -1,5 +1,6 @@
 export { BaseAdapter } from './base-adapter';
 export { BazosAdapter } from './bazos';
+export { BazosSkAdapter } from './bazos-sk';
 export { SbazarAdapter } from './sbazar';
 export { VintedAdapter } from './vinted';
 export { FacebookAdapter } from './facebook';

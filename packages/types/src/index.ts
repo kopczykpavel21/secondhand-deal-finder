@@ -13,7 +13,19 @@ export type Source =
   | 'shpock'
   | 'olx'
   | 'allegro_lokalnie'
-  | 'sprzedajemy';
+  | 'sprzedajemy'
+  | 'bazos_sk'
+  | 'olx_ro'
+  | 'leboncoin'
+  | 'wallapop'
+  | 'milanuncios'
+  | 'marktplaats'
+  | 'gumtree'
+  | 'subito'
+  | 'tweedehands'
+  | 'blocket'
+  | 'jofogas'
+  | 'hardverapro';
 export type SourceSupportLevel = 'full' | 'partial' | 'experimental' | 'unavailable';
 export type SortOption = 'best_deal' | 'newest' | 'cheapest' | 'safest' | 'most_relevant';
 export type Condition = 'new' | 'like_new' | 'good' | 'fair' | 'poor' | 'unknown';

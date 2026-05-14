@@ -45,6 +45,18 @@ const DEFAULT_LIMITS: Partial<Record<Source, number>> = {
   sbazar: 2,
   aukro: 2,
   fler: 2,
+  bazos_sk: 2,
+  olx_ro: 2,
+  leboncoin: 2,
+  wallapop: 2,
+  milanuncios: 2,
+  marktplaats: 2,
+  gumtree: 2,
+  subito: 2,
+  tweedehands: 2,
+  blocket: 2,
+  jofogas: 2,
+  hardverapro: 2,
 };
 
 export class SourceConcurrencyLimiter {

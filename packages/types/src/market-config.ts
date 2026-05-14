@@ -1,6 +1,8 @@
 import type { Source } from './index';
 
-export type MarketId = 'cz' | 'pl' | 'de' | 'at';
+export type MarketId =
+  | 'cz' | 'pl' | 'de' | 'at'
+  | 'sk' | 'ro' | 'fr' | 'es' | 'nl' | 'gb' | 'it' | 'be' | 'se' | 'hu';
 export type SourceBadge = 'full' | 'partial' | 'experimental';
 
 export interface RelativeDateRule {
@@ -336,6 +338,71 @@ export const atMarket: MarketConfig = {
   },
 };
 
+export const skMarket: MarketConfig = {
+  id: 'sk',
+  locale: 'sk-SK',
+  currency: 'EUR',
+  priceBucketSize: 50,
+  minPlausiblePrice: 1,
+  spamPatterns: [
+    /\btel\.?\s*[:.]?\s*\d{9,}/i,
+    /whatsapp/i,
+    /telegram/i,
+    /call me/i,
+  ],
+  stopwords: [],
+  accessoryHeadNouns: [],
+  forPrepositions: [],
+  conditionSignals: {
+    new: ['nový', 'nová', 'nové', 'nepoužívaný', 'nepoužívaná', 'nerozbalený', 'nový tovar'],
+    like_new: ['ako nový', 'ako nová', 'veľmi dobrý stav', 'zánovný', 'zánovná'],
+    good: ['dobrý stav', 'dobrá kondícia', 'zachovalý', 'funkčný', 'používaný'],
+    fair: ['viditeľné stopy', 'škrabance', 'opotrebovaný', 'odreniny'],
+    poor: ['poškodený', 'nefunkčný', 'na náhradné diely', 'na opravu', 'rozbitý'],
+  },
+  relativeDateRules: [
+    { pattern: /pred (\d+) minút/i, unitMs: 60_000 },
+    { pattern: /pred (\d+) hodin/i, unitMs: 3_600_000 },
+    { pattern: /pred hodinou/i, unitMs: 3_600_000, defaultValue: 1 },
+    { pattern: /pred (\d+) dňami/i, unitMs: 86_400_000 },
+    { pattern: /pred dňom/i, unitMs: 86_400_000, defaultValue: 1 },
+    { pattern: /pred (\d+) týždň/i, unitMs: 604_800_000 },
+    { pattern: /pred týždňom/i, unitMs: 604_800_000, defaultValue: 1 },
+    { pattern: /pred (\d+) mesiac/i, unitMs: 2_592_000_000 },
+  ],
+  sourceOptions: [
+    { id: 'bazos_sk', label: 'Bazoš.sk', badge: 'full' },
+    { id: 'vinted', label: 'Vinted', badge: 'partial' },
+  ],
+  sourceLabels: {
+    bazos_sk: 'Bazoš.sk',
+    vinted: 'Vinted',
+    mock: 'Demo',
+  },
+  searchSuggestions: [
+    'iPhone 13 128GB',
+    'horský bicykel',
+    'zimná bunda',
+    'MacBook Pro',
+    'PlayStation 5',
+    'detský kočík',
+  ],
+  texts: {
+    appName: 'Druhá Šanca',
+    title: 'Druhá Šanca – bazárové ponuky',
+    description: 'Nájdeme najlepšie bazárové ponuky na Bazoši a Vinted a zoradíme ich podľa skutočnej hodnoty.',
+    heroBadge: 'Beta · Bazoš.sk · Vinted',
+    tagline: 'Nájdeme najlepšie ponuky na Bazoši a Vinted a zoradíme ich podľa skutočnej hodnoty.',
+    searchPlaceholder: 'Čo hľadáte? Napr. iPhone 13, bicykel, zimná bunda...',
+    emptyStateTitle: 'Napíšte čo hľadáte',
+    emptyStateBody: 'Prehľadáme Bazoš.sk a Vinted naraz.',
+    noResultsTitle: 'Žiadne výsledky',
+    noResultsBody: 'Skúste iné kľúčové slovo alebo upravte filtre.',
+    feedbackButton: 'Spätná väzba',
+    footer: 'Druhá Šanca · Beta · Dáta z tretích strán, len pre informáciu',
+  },
+};
+
 export function getMarketConfig(id: MarketId): MarketConfig {
   switch (id) {
     case 'pl':
@@ -344,6 +411,8 @@ export function getMarketConfig(id: MarketId): MarketConfig {
       return atMarket;
     case 'de':
       return deMarket;
+    case 'sk':
+      return skMarket;
     case 'cz':
     default:
       return czMarket;

@@ -1,6 +1,6 @@
 /**
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- *  SOURCE REALITY REPORT — Bazoš (bazos.cz)
+ *  SOURCE REALITY REPORT — Bazoš (bazos.cz / bazos.sk)
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  *
  *  Support level: FULL (most reliable source in this app)
@@ -22,13 +22,14 @@
  *    <div class="inzeratylok">CITY<br>ZIP</div>
  *    <div class="inzeratyview">VIEWS x</div>
  *  </div>
+ *
+ *  bazos.sk uses the identical HTML structure with EUR prices.
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
-import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
+import type { AdapterConfig, NormalizedListing, SearchFilters, Source } from '@sdf/types';
 import { BaseAdapter } from '../base-adapter';
 
-const BASE_URL = 'https://www.bazos.cz';
 const BLOCK_MARKER = 'class="inzeraty inzeratyflex"';
 const MAX_BLOCK_LEN = 4_000;
 
@@ -131,12 +132,33 @@ function parseBlock(block: string): {
   return { href, title, imageUrl, priceText, location, dateText, description, viewsText, isPromoted };
 }
 
+// ─── Options ──────────────────────────────────────────────────────────────────
+
+export interface BazosAdapterOptions {
+  /** Override the source ID (default: 'bazos'). Used by subclasses like BazosSkAdapter. */
+  source?: Source;
+  /** Override the base URL (default: https://www.bazos.cz). */
+  baseUrl?: string;
+  /** Override the currency code emitted on listings (default: 'CZK'). */
+  currency?: string;
+  /** Override the Accept-Language header (default: 'cs-CZ,cs;q=0.9'). */
+  acceptLanguage?: string;
+}
+
 export class BazosAdapter extends BaseAdapter {
-  source = 'bazos' as const;
+  readonly source: Source;
   supportLevel = 'full' as const;
 
-  constructor(config: Partial<AdapterConfig> = {}) {
+  protected readonly bazosBaseUrl: string;
+  protected readonly bazosCurrency: string;
+  protected readonly bazosLang: string;
+
+  constructor(config: Partial<AdapterConfig> = {}, options: BazosAdapterOptions = {}) {
     super(config);
+    this.source = options.source ?? 'bazos';
+    this.bazosBaseUrl = options.baseUrl ?? 'https://www.bazos.cz';
+    this.bazosCurrency = options.currency ?? 'CZK';
+    this.bazosLang = options.acceptLanguage ?? 'cs-CZ,cs;q=0.9';
   }
 
   buildSearchUrl(query: string, filters?: SearchFilters, start = 0): string {
@@ -151,7 +173,7 @@ export class BazosAdapter extends BaseAdapter {
       kitx: 'ano',
     });
     if (start > 0) params.set('start', String(start));
-    return `${BASE_URL}/search.php?${params.toString()}`;
+    return `${this.bazosBaseUrl}/search.php?${params.toString()}`;
   }
 
   async searchListings(
@@ -206,13 +228,13 @@ export class BazosAdapter extends BaseAdapter {
 
         results.push({
           id: this.makeId(listingId),
-          source: 'bazos',
+          source: this.source,
           sourceListingId: listingId,
-          url: href.startsWith('http') ? href : `${BASE_URL}${href}`,
+          url: href.startsWith('http') ? href : `${this.bazosBaseUrl}${href}`,
           title,
           description,
           price,
-          currency: 'CZK',
+          currency: this.bazosCurrency,
           location,
           postedAt: this.parseBazosDate(dateText),
           conditionText: conditionSource,
@@ -244,7 +266,7 @@ export class BazosAdapter extends BaseAdapter {
       headers: {
         'User-Agent': this.config.userAgent,
         'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'cs-CZ,cs;q=0.9',
+        'Accept-Language': this.bazosLang,
         'Cache-Control': 'no-cache',
       },
       signal: AbortSignal.timeout(this.config.timeout),
@@ -260,7 +282,7 @@ export class BazosAdapter extends BaseAdapter {
 
   private parseBazosPrice(text: string | null): number | null {
     if (!text) return null;
-    if (/dohodou|zdarma|free/i.test(text)) return null;
+    if (/dohodou|zdarma|free|dohodou|po dohode/i.test(text)) return null;
     return this.safePrice(text);
   }
 
@@ -271,6 +293,10 @@ export class BazosAdapter extends BaseAdapter {
     if (/v záruční době|v záruce|záruční|zapečetěný|zapečetěná/.test(lower)) return 'v záruce';
     if (/nerozbalený|nerozbalená|nerozbalené|sealed|boxed/.test(lower)) return 'nerozbalený';
     if (/\bnový\b|\bnová\b|\bnové\b|nepoužitý|nepoužitá|nepoužité|\bnew\b|brand new/.test(lower)) return 'nový';
+    if (/\bnový\b|\bnova\b|\bnové\b|nepoužitý/.test(lower)) return 'nový';
+    // Slovak variants
+    if (/\bnový\b|\bnová\b|\bnepoužívaný\b|\bnepoužívaná\b/.test(lower)) return 'nový';
+    if (/ako nový|ako nová/.test(lower)) return 'ako nový';
     if (/jako nový|jako nová|jako nové|stav jako nový/.test(lower)) return 'jako nový';
     if (/zánovní|zánovni/.test(lower)) return 'zánovní';
     if (/téměř nový|téměř nová|skoro nový|skoro nová/.test(lower)) return 'téměř nový';
@@ -299,7 +325,7 @@ export class BazosAdapter extends BaseAdapter {
     if (!src) return null;
     if (src.startsWith('http')) return src;
     if (src.startsWith('//')) return `https:${src}`;
-    return `${BASE_URL}${src}`;
+    return `${this.bazosBaseUrl}${src}`;
   }
 
   private parseBazosDate(text: string | null): Date | null {
