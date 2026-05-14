@@ -7,6 +7,7 @@ import {
   BazosSkAdapter,
   FlerAdapter,
   KleinanzeigeAdapter,
+  LeBonCoinAdapter,
   MockAdapter,
   OlxAdapter,
   OlxRoAdapter,
@@ -130,6 +131,42 @@ export function createAustriaSearchCoordinator(options: {
 
 export function createProductionAustriaSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
   return createAustriaSearchCoordinator({
+    cache: cache ?? null,
+    limiter: createSourceConcurrencyLimiter(),
+  });
+}
+
+export function buildFrenchAdapters(options: {
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SourceAdapter[] {
+  if (process.env.USE_MOCK_ADAPTERS === 'true') {
+    return [new MockAdapter()];
+  }
+
+  const adapters: SourceAdapter[] = [new LeBonCoinAdapter()];
+  if (process.env.ENABLE_VINTED !== 'false') {
+    adapters.push(new VintedAdapter({
+      baseUrl: 'https://www.vinted.fr',
+      marketConfig: getMarketConfig('fr'),
+    }));
+  }
+
+  if (!options.limiter) return adapters;
+  return adapters.map((adapter) => throttleAdapter(adapter, options.limiter!));
+}
+
+export function createFrenchSearchCoordinator(options: {
+  cache?: SearchCache | null;
+  limiter?: SourceConcurrencyLimiter;
+} = {}): SearchCoordinator {
+  return new SearchCoordinator(
+    buildFrenchAdapters({ limiter: options.limiter }),
+    { marketConfig: getMarketConfig('fr'), cache: options.cache ?? null, cacheNamespace: 'fr' },
+  );
+}
+
+export function createProductionFrenchSearchCoordinator(cache?: SearchCache | null): SearchCoordinator {
+  return createFrenchSearchCoordinator({
     cache: cache ?? null,
     limiter: createSourceConcurrencyLimiter(),
   });

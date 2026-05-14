@@ -466,6 +466,72 @@ export const roMarket: MarketConfig = {
   },
 };
 
+export const frMarket: MarketConfig = {
+  id: 'fr',
+  locale: 'fr-FR',
+  currency: 'EUR',
+  priceBucketSize: 50,
+  minPlausiblePrice: 1,
+  spamPatterns: [
+    /\btel\.?\s*[:.]?\s*\d{9,}/i,
+    /whatsapp/i,
+    /telegram/i,
+    /call me/i,
+  ],
+  stopwords: ['le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'en', 'au', 'aux'],
+  accessoryHeadNouns: [
+    'étui', 'coque', 'housse', 'film', 'protège', 'chargeur', 'câble', 'adaptateur',
+    'support', 'bracelet', 'écouteurs', 'enceinte',
+  ],
+  forPrepositions: ['pour', 'compatible', 'de'],
+  conditionSignals: {
+    new: ['neuf', 'neuve', 'nouveau', 'nouvelle', 'jamais utilisé', 'sous blister', 'scellé'],
+    like_new: ['comme neuf', 'quasi neuf', 'parfait état', 'état impeccable', 'très bon état'],
+    good: ['bon état', 'très bien', 'fonctionne parfaitement', 'peu utilisé', 'bien entretenu'],
+    fair: ['traces d\'usure', 'rayures', 'légèrement abîmé', 'usé'],
+    poor: ['défectueux', 'en panne', 'pour pièces', 'à réparer', 'cassé', 'hs'],
+  },
+  relativeDateRules: [
+    { pattern: /il y a (\d+) minute/i, unitMs: 60_000 },
+    { pattern: /il y a (\d+) heure/i, unitMs: 3_600_000 },
+    { pattern: /il y a une heure/i, unitMs: 3_600_000, defaultValue: 1 },
+    { pattern: /il y a (\d+) jour/i, unitMs: 86_400_000 },
+    { pattern: /hier/i, unitMs: 86_400_000, defaultValue: 1 },
+    { pattern: /il y a (\d+) semaine/i, unitMs: 604_800_000 },
+  ],
+  sourceOptions: [
+    { id: 'leboncoin', label: 'LeBonCoin', badge: 'full' },
+    { id: 'vinted', label: 'Vinted', badge: 'full' },
+  ],
+  sourceLabels: {
+    leboncoin: 'LeBonCoin',
+    vinted: 'Vinted',
+    mock: 'Demo',
+  },
+  searchSuggestions: [
+    'iPhone 13 128GB',
+    'vélo de montagne',
+    'veste d\'hiver',
+    'MacBook Pro',
+    'PlayStation 5',
+    'poussette bébé',
+  ],
+  texts: {
+    appName: 'Occasion Malin',
+    title: 'Occasion Malin – meilleures occasions',
+    description: 'Trouvez les meilleures occasions sur LeBonCoin et Vinted. Triées par valeur réelle.',
+    heroBadge: 'Bêta · LeBonCoin · Vinted',
+    tagline: 'Trouvez les meilleures occasions sur LeBonCoin et Vinted — triées par valeur réelle.',
+    searchPlaceholder: 'Que cherchez-vous ? Ex. iPhone 13, vélo, veste d\'hiver...',
+    emptyStateTitle: 'Tapez ce que vous cherchez',
+    emptyStateBody: 'Nous cherchons sur LeBonCoin et Vinted en même temps.',
+    noResultsTitle: 'Aucun résultat',
+    noResultsBody: 'Essayez un autre mot-clé ou modifiez les filtres.',
+    feedbackButton: 'Avis',
+    footer: 'Occasion Malin · Bêta · Données de tiers, à titre informatif uniquement',
+  },
+};
+
 export function getMarketConfig(id: MarketId): MarketConfig {
   switch (id) {
     case 'pl':
@@ -478,6 +544,8 @@ export function getMarketConfig(id: MarketId): MarketConfig {
       return skMarket;
     case 'ro':
       return roMarket;
+    case 'fr':
+      return frMarket;
     case 'cz':
     default:
       return czMarket;

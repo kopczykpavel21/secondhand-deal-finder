@@ -26,6 +26,8 @@
     "build:worker:sk": "npm run build --workspace=apps/worker-sk",
     "dev:worker:ro": "npm run dev --workspace=apps/worker-ro",
     "build:worker:ro": "npm run build --workspace=apps/worker-ro",
+    "dev:worker:fr": "npm run dev --workspace=apps/worker-fr",
+    "build:worker:fr": "npm run build --workspace=apps/worker-fr",
     "lint": "npm run lint --workspace=apps/web",
     "lint:pl": "npm run lint --workspace=apps/web-pl"
   },
