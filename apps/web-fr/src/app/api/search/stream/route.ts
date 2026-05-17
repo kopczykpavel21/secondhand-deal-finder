@@ -1,8 +1,10 @@
+
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { createSearchCacheKey } from '@sdf/core';
 import type { SearchResponse, Source } from '@sdf/types';
 import {
+
   checkRateLimit,
   createFrenchSearchCoordinator,
   enqueueSearchJob,
@@ -12,6 +14,8 @@ import {
   isWorkerSearchEnabled,
   readSearchJobEvents,
 } from '@sdf/platform';
+
+export const maxDuration = 60;
 
 const SearchSchema = z.object({
   query: z.string().min(1).max(200),
