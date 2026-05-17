@@ -13,6 +13,8 @@ import {
   readSearchJobEvents,
 } from '@sdf/platform';
 
+export const maxDuration = 60;
+
 const SearchSchema = z.object({
   query: z.string().min(1).max(200),
   priceMin: z.coerce.number().optional(),
