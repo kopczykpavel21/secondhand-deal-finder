@@ -1,0 +1,35 @@
+{
+  "name": "Secondhand Okazje",
+  "short_name": "Okazje",
+  "description": "Porównujemy oferty z OLX, Allegro Lokalnie i Vinted.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f1f5f9",
+  "theme_color": "#0284c7",
+  "categories": ["shopping", "utilities"],
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Szukaj iPhone'a",
+      "short_name": "iPhone",
+      "url": "/?q=iPhone+13",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Szukaj roweru",
+      "short_name": "Rower",
+      "url": "/?q=rower+g%C3%B3rski",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    }
+  ]
+}

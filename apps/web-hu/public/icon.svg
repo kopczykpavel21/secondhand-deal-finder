@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#0284c7"/>
+  <!-- Magnifying glass -->
+  <circle cx="220" cy="210" r="100" fill="none" stroke="white" stroke-width="44"/>
+  <line x1="292" y1="282" x2="390" y2="380" stroke="white" stroke-width="44" stroke-linecap="round"/>
+  <!-- Small tag/price badge -->
+  <circle cx="340" cy="150" r="52" fill="#fbbf24"/>
+  <text x="340" y="162" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="48" fill="#1e3a5f">Kč</text>
+</svg>
