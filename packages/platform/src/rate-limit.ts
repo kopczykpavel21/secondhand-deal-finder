@@ -1,4 +1,4 @@
-import { getRedisClient } from './redis';
+import { getRedisClient } from './redis.js';
 
 interface CounterState {
   count: number;

@@ -70,6 +70,11 @@ const SOURCE_META: Record<
     color: 'bg-red-50 text-red-700 border-red-200',
     dot: 'bg-red-500',
   },
+  tipcars: {
+    label: 'TipCars',
+    color: 'bg-slate-50 text-slate-700 border-slate-200',
+    dot: 'bg-slate-500',
+  },
 };
 
 export function SourceBadge({ source }: { source: Source }) {

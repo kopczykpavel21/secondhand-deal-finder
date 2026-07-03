@@ -13,3 +13,11 @@ test-results/
 # OS
 .DS_Store
 Thumbs.db
+
+# Research data — raw harvests contain seller PII, never commit
+apps/research-harvester/data/
+apps/research-vehicles-cz/data/
+apps/*/figures/
+
+# Build artifacts
+*.tsbuildinfo

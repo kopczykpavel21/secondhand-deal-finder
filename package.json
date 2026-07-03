@@ -27,7 +27,13 @@
     "build:gr": "npm run build --workspace=apps/web-gr",
     "build:worker:gr": "npm run build --workspace=apps/worker-gr",
     "lint": "npm run lint --workspace=apps/web",
-    "lint:pl": "npm run lint --workspace=apps/web-pl"
+    "lint:pl": "npm run lint --workspace=apps/web-pl",
+    "research:vehicles:cz": "npm run harvest --workspace=apps/research-vehicles-cz",
+    "research:vehicles:cz:pilot": "npm run harvest:pilot --workspace=apps/research-vehicles-cz",
+    "research:vehicles:cz:analyze": "npm run analyze --workspace=apps/research-vehicles-cz",
+    "research:vehicles:cz:audit-sample": "npm run audit-sample --workspace=apps/research-vehicles-cz",
+    "research:vehicles:cz:build-dataset": "npm run build-dataset --workspace=apps/research-vehicles-cz",
+    "research:vehicles:cz:regressions": "npm run regressions --workspace=apps/research-vehicles-cz"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

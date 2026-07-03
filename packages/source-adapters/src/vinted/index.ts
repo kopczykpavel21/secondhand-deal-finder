@@ -33,7 +33,7 @@
 
 import type { AdapterConfig, MarketConfig, NormalizedListing, SearchFilters } from '@sdf/types';
 import { getMarketConfig } from '@sdf/types';
-import { BaseAdapter } from '../base-adapter';
+import { BaseAdapter } from '../base-adapter.js';
 
 // Default to Czech market — pass baseUrl to constructor for other locales (e.g. vinted.de)
 const DEFAULT_BASE_URL = 'https://www.vinted.cz';

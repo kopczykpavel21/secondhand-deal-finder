@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { getPostgresPool } from './postgres';
+import { getPostgresPool } from './postgres.js';
 
 export interface FeedbackEntry {
   id: string;

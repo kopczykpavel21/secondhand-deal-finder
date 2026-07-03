@@ -30,7 +30,7 @@
  */
 
 import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
-import { BaseAdapter } from '../base-adapter';
+import { BaseAdapter } from '../base-adapter.js';
 
 const BASE_URL = 'https://aukro.cz';
 

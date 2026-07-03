@@ -1,6 +1,6 @@
 import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
 import { getMarketConfig } from '@sdf/types';
-import { BaseAdapter } from '../base-adapter';
+import { BaseAdapter } from '../base-adapter.js';
 
 const BASE_URL = 'https://www.olx.pl';
 const API_URL = 'https://www.olx.pl/api/v1';

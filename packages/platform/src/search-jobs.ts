@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto';
 import type { MarketId, SearchRequest, SearchResponse, SearchStreamEvent } from '@sdf/types';
 import { createSearchCacheKey } from '@sdf/core';
-import { getRedisClient } from './redis';
+import { getRedisClient } from './redis.js';
 
 export type SearchJobEvent =
   | SearchStreamEvent

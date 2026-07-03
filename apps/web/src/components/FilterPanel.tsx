@@ -7,6 +7,7 @@ import clsx from 'clsx';
 interface FilterPanelProps {
   filters: SearchFilters;
   onChange: (filters: SearchFilters) => void;
+  onSortChange: (sortBy: SortOption) => void;
 }
 
 const SOURCES: { id: Source; label: string; badge: string }[] = [
@@ -16,11 +17,12 @@ const SOURCES: { id: Source; label: string; badge: string }[] = [
   { id: 'fler',   label: 'Fler',   badge: 'partial' },
 ];
 
-const SORT_OPTIONS: { id: SortOption; label: string; hint?: string }[] = [
+export const SORT_OPTIONS: { id: SortOption; label: string; hint?: string }[] = [
   { id: 'best_deal',     label: 'Nejlepší nabídka' },
   { id: 'most_relevant', label: 'Nejlepší shoda', hint: 'Cena se nebere v úvahu' },
   { id: 'newest',        label: 'Nejnovější' },
   { id: 'cheapest',      label: 'Nejlevnější' },
+  { id: 'priciest',      label: 'Nejdražší' },
   { id: 'safest',        label: 'Nejdůvěryhodnější' },
 ];
 
@@ -38,7 +40,7 @@ const BADGE_STYLE: Record<string, string> = {
   experimental: 'bg-orange-100 text-orange-700',
 };
 
-export function FilterPanel({ filters, onChange }: FilterPanelProps) {
+export function FilterPanel({ filters, onChange, onSortChange }: FilterPanelProps) {
   const [open, setOpen] = useState(false);
 
   const activeSources    = filters.sources    ?? SOURCES.map((s) => s.id);
@@ -185,7 +187,7 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
                 return (
                   <button
                     key={opt.id}
-                    onClick={() => onChange({ ...filters, sortBy: opt.id })}
+                    onClick={() => onSortChange(opt.id)}
                     className={clsx(
                       'px-3 py-1.5 text-sm rounded-lg border font-medium transition-colors',
                       active

@@ -12,6 +12,12 @@ const nextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
+    // TS packages use ESM-style .js-extension relative imports; map them back
+    // to their .ts sources for webpack resolution.
+    config.resolve.extensionAlias = {
+      ...(config.resolve.extensionAlias ?? {}),
+      '.js': ['.ts', '.tsx', '.js'],
+    };
     if (isServer) {
       const playwrightModules = [
         'playwright',

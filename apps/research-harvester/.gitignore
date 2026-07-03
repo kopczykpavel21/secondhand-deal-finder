@@ -1,0 +1,4 @@
+# Harvested snapshots contain seller PII (names/locations) — never commit.
+# Released datasets must be aggregated to brand×category and de-identified.
+data/
+dist/

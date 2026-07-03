@@ -1,0 +1,21 @@
+{
+  "name": "@sdf/research-harvester",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One-time research scraper: harvests the CZ+DE secondhand major-appliance market into a snapshot for the brand-durability-proxy study.",
+  "scripts": {
+    "harvest": "tsx src/index.ts",
+    "harvest:pilot": "tsx src/index.ts --pilot",
+    "enrich": "tsx src/enrich-run.ts",
+    "pilot-analysis": "tsx src/pilot-analysis.ts",
+    "analysis:ords": "python3 research/ords_validation.py",
+    "analysis:hedonic": "python3 research/hedonic_model.py",
+    "analysis:bdp": "python3 research/bdp_composite.py",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sdf/source-adapters": "*",
+    "@sdf/platform": "*",
+    "@sdf/types": "*"
+  }
+}

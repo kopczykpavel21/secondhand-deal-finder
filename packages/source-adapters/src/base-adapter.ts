@@ -9,7 +9,7 @@ import type {
 } from '@sdf/types';
 import { DEFAULT_ADAPTER_CONFIG, czMarket, parseRelativeDate as parseMarketRelativeDate } from '@sdf/types';
 import type { Page } from 'playwright';
-import { withPooledPage } from './browser-pool';
+import { withPooledPage } from './browser-pool.js';
 import { normalizeCondition } from '@sdf/scoring';
 
 export abstract class BaseAdapter implements SourceAdapter {

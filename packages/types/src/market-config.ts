@@ -1,4 +1,4 @@
-import type { Source } from './index';
+import type { Source } from './index.js';
 
 export type MarketId = 'cz' | 'pl' | 'de' | 'at' | 'gr';
 export type SourceBadge = 'full' | 'partial' | 'experimental';
@@ -114,6 +114,7 @@ export const czMarket: MarketConfig = {
     { pattern: /před (\d+) měsíc/i, unitMs: 2_592_000_000 },
   ],
   sourceOptions: [
+    { id: 'tipcars', label: 'TipCars', badge: 'full' },
     { id: 'bazos', label: 'Bazoš', badge: 'full' },
     { id: 'vinted', label: 'Vinted', badge: 'partial' },
     { id: 'aukro', label: 'Aukro', badge: 'partial' },
@@ -126,6 +127,7 @@ export const czMarket: MarketConfig = {
     facebook: 'Facebook',
     aukro: 'Aukro',
     fler: 'Fler',
+    tipcars: 'TipCars',
     mock: 'Demo',
     willhaben: 'willhaben',
   },

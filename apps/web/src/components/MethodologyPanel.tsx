@@ -65,6 +65,11 @@ const SORT_META: Record<SortOption, SortMeta> = {
     note: 'Pořadí určuje cena od nejnižší. Inzeráty bez uvedené ceny jsou na konci. Skóre se stále počítá.',
     orderByLabel: 'Cena (nejnižší nahoře)',
   },
+  priciest: {
+    headline: 'Nejdražší',
+    note: 'Pořadí určuje cena od nejvyšší. Inzeráty bez uvedené ceny jsou na konci. Skóre se stále počítá.',
+    orderByLabel: 'Cena (nejvyšší nahoře)',
+  },
   safest: {
     headline: 'Nejdůvěryhodnější',
     note: 'Pořadí určuje hodnocení prodávajícího. Bazoš a Fler tato data neposkytují — jejich inzeráty se zobrazí na konci.',

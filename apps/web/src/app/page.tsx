@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { SearchFilters } from '@sdf/types';
+import { useState, useEffect, useRef } from 'react';
+import type { SearchFilters, SortOption } from '@sdf/types';
 import { useSearch } from '@/hooks/useSearch';
 import { SearchBar } from '@/components/SearchBar';
-import { FilterPanel } from '@/components/FilterPanel';
+import { FilterPanel, SORT_OPTIONS } from '@/components/FilterPanel';
 import { ResultCard } from '@/components/ResultCard';
 import { SourceStatusBar } from '@/components/SourceStatusBar';
 import { MethodologyPanel } from '@/components/MethodologyPanel';
@@ -40,6 +40,7 @@ export default function HomePage() {
   const [page, setPage] = useState(0);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   // Load dismissed IDs from localStorage after mount (avoids SSR mismatch)
   useEffect(() => { setDismissed(loadDismissed()); }, []);
@@ -56,6 +57,20 @@ export default function HomePage() {
     setCurrentQuery(query);
     setPage(0);
     search(query, { ...filters, debug: debugMode, limit: FETCH_LIMIT });
+
+    // Jump down to the results area — with the filter panel open, the
+    // products can start below the fold and it's not obvious a search ran.
+    (document.activeElement as HTMLElement | null)?.blur();
+    requestAnimationFrame(() => {
+      mainRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  function changeSort(sortBy: SortOption) {
+    const updated = { ...filters, sortBy };
+    setFilters(updated);
+    setPage(0);
+    search(currentQuery, { ...updated, debug: debugMode, limit: FETCH_LIMIT });
   }
 
   // Unified data accessors — work for both 'loading' (partial) and 'success'
@@ -110,7 +125,7 @@ export default function HomePage() {
         {/* Search */}
         <div className="max-w-2xl mx-auto space-y-3">
           <SearchBar onSearch={handleSearch} loading={isLoading} />
-          <FilterPanel filters={filters} onChange={setFilters} />
+          <FilterPanel filters={filters} onChange={setFilters} onSortChange={changeSort} />
           <button
             onClick={() => setDebugMode((v) => !v)}
             className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
@@ -125,7 +140,7 @@ export default function HomePage() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-2xl mx-auto px-4 pb-16">
+      <main ref={mainRef} className="max-w-2xl mx-auto px-4 pb-16">
 
         {/* Loading animation — only when no partial results yet */}
         {showAnimation && (
@@ -160,7 +175,22 @@ export default function HomePage() {
                   <span className="w-4 h-4 border-2 border-slate-200 border-t-brand-500 rounded-full animate-spin" />
                 )}
               </div>
-              <SourceStatusBar sources={sources} />
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-400">Řadit:</span>
+                  <select
+                    aria-label="Řadit výsledky"
+                    value={filters.sortBy ?? 'best_deal'}
+                    onChange={(e) => changeSort(e.target.value as SortOption)}
+                    className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+                  >
+                    {SORT_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <SourceStatusBar sources={sources} />
+              </div>
             </div>
 
             {/* Loading pills — which sources are still pending */}
@@ -198,12 +228,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    const updated = { ...filters, sortBy: 'most_relevant' as const };
-                    setFilters(updated);
-                    setPage(0);
-                    search(currentQuery, { ...updated, debug: debugMode, limit: FETCH_LIMIT });
-                  }}
+                  onClick={() => changeSort('most_relevant')}
                   className="shrink-0 px-4 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-700 hover:border-brand-400 hover:text-brand-600 transition-colors shadow-sm whitespace-nowrap"
                 >
                   Hledat podle shody →

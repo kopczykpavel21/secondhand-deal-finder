@@ -47,7 +47,7 @@
  */
 
 import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
-import { BaseAdapter } from '../base-adapter';
+import { BaseAdapter } from '../base-adapter.js';
 import type { Page } from 'playwright';
 
 const BASE_URL = 'https://www.facebook.com';

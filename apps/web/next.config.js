@@ -1,15 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  transpilePackages: ['@sdf/types', '@sdf/core', '@sdf/scoring', '@sdf/source-adapters'],
+  transpilePackages: ['@sdf/types', '@sdf/core', '@sdf/platform', '@sdf/scoring', '@sdf/source-adapters'],
   experimental: {
     serverComponentsExternalPackages: [
       'playwright',
       'playwright-core',
       'generic-pool',
+      'pg',
+      'redis',
     ],
   },
   webpack: (config, { isServer }) => {
+    // TS packages use ESM-style .js-extension relative imports; map them back
+    // to their .ts sources for webpack resolution.
+    config.resolve.extensionAlias = {
+      ...(config.resolve.extensionAlias ?? {}),
+      '.js': ['.ts', '.tsx', '.js'],
+    };
     if (isServer) {
       // Prevent webpack from bundling playwright and its dependencies —
       // they rely on native binaries and must stay as node_modules at runtime.

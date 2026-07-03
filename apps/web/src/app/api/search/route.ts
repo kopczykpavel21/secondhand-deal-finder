@@ -25,7 +25,7 @@ const SearchSchema = z.object({
       v ? (v.split(',') as Source[]) : undefined,
     ),
   sortBy: z
-    .enum(['best_deal', 'newest', 'cheapest', 'safest', 'most_relevant'])
+    .enum(['best_deal', 'newest', 'cheapest', 'priciest', 'safest', 'most_relevant'])
     .optional()
     .default('best_deal'),
   debug: z

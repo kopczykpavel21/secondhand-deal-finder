@@ -24,6 +24,7 @@ const SOURCE_LABEL: Record<Source, string> = {
   olx:              'OLX',
   allegro_lokalnie: 'Allegro',
   sprzedajemy:      'Sprzedajemy',
+  tipcars:          'TipCars',
 };
 
 const SCORING_STEPS = ['Porovnávám ceny…', 'Přiřazuji skóre…', 'Seřazuji nabídky…'];

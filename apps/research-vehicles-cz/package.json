@@ -1,0 +1,21 @@
+{
+  "name": "@sdf/research-vehicles-cz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One-time Czech passenger-vehicle research harvester for the brand durability proxy study.",
+  "scripts": {
+    "harvest": "node --import tsx src/index.ts",
+    "harvest:pilot": "node --import tsx src/index.ts --pilot",
+    "analyze": "node --import tsx src/analyze.ts",
+    "audit-sample": "node --import tsx src/sample-audit.ts",
+    "build-dataset": "node --import tsx src/build-analysis-dataset.ts",
+    "regressions": "node --import tsx src/regressions.ts",
+    "convert-sda-registrations": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/convert_sda_registrations.py",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sdf/source-adapters": "*",
+    "@sdf/platform": "*",
+    "@sdf/types": "*"
+  }
+}

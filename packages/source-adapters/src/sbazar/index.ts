@@ -18,7 +18,7 @@
  */
 
 import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
-import { BaseAdapter } from '../base-adapter';
+import { BaseAdapter } from '../base-adapter.js';
 
 const BASE_URL = 'https://www.sbazar.cz';
 
@@ -212,7 +212,30 @@ export class SbazarAdapter extends BaseAdapter {
     query: string,
     filters?: SearchFilters,
   ): Promise<NormalizedListing[]> {
-    // Known Sbazar internal API endpoint patterns
+    // Live endpoint (verified 2026-07): /api/v1/items/search?phrase=…
+    // Note: the parameter is `phrase`, not `q` — `q` is silently ignored.
+    // Paginate via offset; 100 per page, 3 pages max.
+    const all: NormalizedListing[] = [];
+    const seen = new Set<string>();
+    for (let offset = 0; offset < 300; offset += 100) {
+      const params = new URLSearchParams({
+        phrase: query,
+        limit: '100',
+        offset: String(offset),
+      });
+      if (filters?.priceMin != null) params.set('price_from', String(filters.priceMin));
+      if (filters?.priceMax != null) params.set('price_to', String(filters.priceMax));
+      const url = `${BASE_URL}/api/v1/items/search?${params.toString()}`;
+      const page = await this.fetchApiPage(url);
+      if (page === null) break; // endpoint unreachable — stop paginating
+      const fresh = page.filter((l) => !seen.has(l.sourceListingId));
+      fresh.forEach((l) => seen.add(l.sourceListingId));
+      all.push(...fresh);
+      if (page.length < 100) break; // last page
+    }
+    if (all.length > 0) return all;
+
+    // Legacy endpoint patterns kept as fallback
     const apiUrls = [
       `${BASE_URL}/api/v1/ads?q=${encodeURIComponent(query)}&limit=40`,
       `${BASE_URL}/api/search?q=${encodeURIComponent(query)}&limit=40`,
@@ -252,6 +275,34 @@ export class SbazarAdapter extends BaseAdapter {
     return [];
   }
 
+  /** Fetch one items/search page; null = endpoint unreachable, [] = empty page. */
+  private async fetchApiPage(url: string): Promise<NormalizedListing[] | null> {
+    this.log(`Trying JSON API: ${url}`);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { ...HEADERS, Accept: 'application/json' },
+        signal: AbortSignal.timeout(this.config.timeout),
+      });
+    } catch {
+      return null;
+    }
+    if (!res.ok) {
+      this.log(`API ${url} → HTTP ${res.status}`);
+      return null;
+    }
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      return null;
+    }
+    const candidates = this.extractCandidates(data);
+    return candidates
+      .map((c) => this.normalizeApiItem(c as Record<string, unknown>))
+      .filter(Boolean) as NormalizedListing[];
+  }
+
   private extractCandidates(data: unknown): unknown[] {
     if (!data || typeof data !== 'object') return [];
     if (Array.isArray(data)) return this.filterListingLike(data);
@@ -281,7 +332,7 @@ export class SbazarAdapter extends BaseAdapter {
     if (!title) return null;
 
     const rawUrl = (raw.url ?? raw.link ?? raw.href) as string | undefined;
-    const slug = (raw.seoUrl ?? raw.slug ?? raw.seoName) as string | undefined;
+    const slug = (raw.seoUrl ?? raw.slug ?? raw.seoName ?? raw.seo_name) as string | undefined;
     const id = (raw.id ?? raw.advertId) as string | number | undefined;
     const listingUrl = rawUrl
       ? (rawUrl.startsWith('http') ? rawUrl : `${BASE_URL}${rawUrl}`)
@@ -303,9 +354,9 @@ export class SbazarAdapter extends BaseAdapter {
     const locObj = (raw.locality ?? raw.location) as Record<string, unknown> | string | undefined;
     const location = typeof locObj === 'string'
       ? locObj
-      : (locObj?.name ?? locObj?.city ?? locObj?.district) as string | undefined ?? null;
+      : (locObj?.name ?? locObj?.city ?? locObj?.municipality ?? locObj?.district) as string | undefined ?? null;
 
-    const dateRaw = (raw.date ?? raw.createdAt ?? raw.datePosted ?? raw.insertTime) as string | undefined;
+    const dateRaw = (raw.date ?? raw.createdAt ?? raw.create_date ?? raw.datePosted ?? raw.insertTime) as string | undefined;
     const postedAt = dateRaw ? (this.safeDate(dateRaw) ?? this.parseCzechRelativeDate(dateRaw)) : null;
 
     const imgs = raw.images as unknown[] | undefined;

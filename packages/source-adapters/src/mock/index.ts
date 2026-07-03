@@ -5,7 +5,7 @@
  */
 
 import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
-import { BaseAdapter } from '../base-adapter';
+import { BaseAdapter } from '../base-adapter.js';
 
 const MOCK_LISTINGS: Omit<NormalizedListing, 'id'>[] = [
   {

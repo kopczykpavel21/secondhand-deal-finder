@@ -14,12 +14,12 @@ import type {
 import { czMarket } from '@sdf/types';
 import type { SourceAdapter } from '@sdf/types';
 import { scoreListings, DEFAULT_WEIGHTS } from '@sdf/scoring';
-import { deduplicateListings } from './deduplicator';
+import { deduplicateListings } from './deduplicator.js';
 import {
   createSearchCacheKey,
   DEFAULT_SEARCH_CACHE_TTL_MS,
   type SearchCache,
-} from './search-cache';
+} from './search-cache.js';
 
 // ─── Minimal async queue — delivers items in arrival order ───────────────────
 
@@ -387,6 +387,12 @@ function sortResults(listings: ScoredListing[], sortBy: SortOption): ScoredListi
         if (a.price === null) return 1;
         if (b.price === null) return -1;
         return a.price - b.price;
+      });
+    case 'priciest':
+      return [...listings].sort((a, b) => {
+        if (a.price === null) return 1;
+        if (b.price === null) return -1;
+        return b.price - a.price;
       });
     case 'safest':
       return [...listings].sort(

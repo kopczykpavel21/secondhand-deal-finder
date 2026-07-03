@@ -65,6 +65,11 @@ const SORT_META: Record<SortOption, SortMeta> = {
     note: 'Kolejność zależy od ceny rosnąco. Oferty bez podanej ceny trafiają na koniec. Wynik nadal jest liczony.',
     orderByLabel: 'Cena (najniższa u góry)',
   },
+  priciest: {
+    headline: 'Najdroższe',
+    note: 'Kolejność zależy od ceny malejąco. Oferty bez podanej ceny trafiają na koniec. Wynik nadal jest liczony.',
+    orderByLabel: 'Cena (najwyższa u góry)',
+  },
   safest: {
     headline: 'Najbardziej wiarygodne',
     note: 'Kolejność zależy od oceny sprzedającego. Źródła bez danych o sprzedającym są wyświetlane niżej.',

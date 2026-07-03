@@ -6,14 +6,14 @@ import type {
   ScoreComponents,
 } from '@sdf/types';
 import { czMarket } from '@sdf/types';
-import { DEFAULT_WEIGHTS } from './weights';
-import { scoreRelevance } from './components/relevance';
-import { scoreValueForMoney } from './components/value-for-money';
-import { scoreCondition } from './components/condition';
-import { scoreFreshness } from './components/freshness';
-import { scoreCompleteness } from './components/completeness';
-import { scoreSellerTrust } from './components/seller-trust';
-import { scoreEngagement } from './components/engagement';
+import { DEFAULT_WEIGHTS } from './weights.js';
+import { scoreRelevance } from './components/relevance.js';
+import { scoreValueForMoney } from './components/value-for-money.js';
+import { scoreCondition } from './components/condition.js';
+import { scoreFreshness } from './components/freshness.js';
+import { scoreCompleteness } from './components/completeness.js';
+import { scoreSellerTrust } from './components/seller-trust.js';
+import { scoreEngagement } from './components/engagement.js';
 
 // ─── Spam / low-quality listing detection ────────────────────────────────────
 

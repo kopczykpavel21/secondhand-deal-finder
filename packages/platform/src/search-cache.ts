@@ -1,7 +1,7 @@
 import type { SearchResponse } from '@sdf/types';
 import type { SearchCache } from '@sdf/core';
 import { DEFAULT_SEARCH_CACHE_TTL_MS } from '@sdf/core';
-import { getRedisClient } from './redis';
+import { getRedisClient } from './redis.js';
 
 interface MemoryCacheEntry {
   response: SearchResponse;

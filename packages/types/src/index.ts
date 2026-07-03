@@ -13,9 +13,10 @@ export type Source =
   | 'shpock'
   | 'olx'
   | 'allegro_lokalnie'
-  | 'sprzedajemy';
+  | 'sprzedajemy'
+  | 'tipcars';
 export type SourceSupportLevel = 'full' | 'partial' | 'experimental' | 'unavailable';
-export type SortOption = 'best_deal' | 'newest' | 'cheapest' | 'safest' | 'most_relevant';
+export type SortOption = 'best_deal' | 'newest' | 'cheapest' | 'priciest' | 'safest' | 'most_relevant';
 export type Condition = 'new' | 'like_new' | 'good' | 'fair' | 'poor' | 'unknown';
 
 // ─── Core listing model ───────────────────────────────────────────────────────
@@ -209,4 +210,4 @@ export interface SourceAdapter {
   >;
 }
 
-export * from './market-config';
+export * from './market-config.js';

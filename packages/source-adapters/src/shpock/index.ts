@@ -53,7 +53,7 @@
  */
 
 import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
-import { BaseAdapter } from '../base-adapter';
+import { BaseAdapter } from '../base-adapter.js';
 
 const GRAPHQL_URL = 'https://www.shpock.com/graphql';
 const IMAGE_BASE = 'https://m1.secondhandapp.at/2.0';
