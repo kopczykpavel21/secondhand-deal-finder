@@ -124,7 +124,7 @@ market; n = 9,059 priced listings; R² = 0.075) shows:
 - **age_old = +0.213*** (SE 0.036): old-vintage listings sell for ~24% *more* than
   recent-vintage listings at equal brand, condition, and capacity. This reversal of ordinary
   depreciation is the market-wide demonstrated-survival premium predicted by the
-  survivor-selection mechanism (§2.1) and directly supports RQ3. The coefficient has been
+  survivor-selection mechanism (§2.2) and directly supports RQ3. The coefficient has been
   stable (+0.20 to +0.25) across every data revision — wave 1 alone, two waves, and the
   full three-run pool.
 - **status_working = −0.061** (p = .005): a small negative composition effect — degraded

@@ -2,11 +2,13 @@
 
 ## 5.1  Summary of findings
 
-This study set out to test whether a brand-level durability proxy for major household
-appliances can be constructed from a one-time cross-section of secondhand-market listings
-(RQ1), whether such a proxy tracks independent reliability evidence (RQ2), which selection
-mechanism dominates the appliance resale market (RQ3), and whether brand durability ranks
-replicate across borders (RQ4). Four findings organise the answers.
+This study set out to ask four questions of the secondhand market: whether it can be made
+to yield a brand-level durability measure at all (RQ1), whether what it yields agrees with
+what laboratories find (RQ2), which of the two selection forces — the flight of lemons or
+the parade of survivors — governs its composition (RQ3), and whether the answers travel
+across a border (RQ4). The market, like most witnesses, answered some questions plainly,
+answered others in ways that required interpretation, and to one question gave an answer we
+did not expect but should have. Four findings organise the testimony.
 
 **First, the proxy is constructible and internally coherent (RQ1).** From 17,483 pooled
 listings we derived three signals — functional-survival ratio (S1), hedonic residual-value
@@ -54,8 +56,10 @@ auctions), not through S1.
 
 ## 5.2  A two-dimensional quality space
 
-The most consequential null results in this study — BDP ⊥ ORDS repairability (all |ρ| <
-0.22) and BDP ⊥ the official French repairability index (all |ρ| ≤ 0.19) — imply that
+A machine can fail its owner in two quite different ways: it can stop working, or it can
+stop being worth fixing. The most consequential null results in this study — BDP ⊥ ORDS
+repairability (all |ρ| < 0.22) and BDP ⊥ the official French repairability index (all
+|ρ| ≤ 0.19) — say that these two failures are, across brands, statistically unacquainted:
 "product quality" in the circular-economy sense is not a scalar. Two unrelated
 repairability sources, one crowd-sourced and one regulatory, sit orthogonal to the BDP. Our
 data locate every brand in a two-dimensional space:
@@ -92,14 +96,19 @@ measures. It is not absolute engineering reliability. It is **effective market d
 the durability of the brand's stock as it actually circulates in the secondhand economy, after
 retention behaviour and repair economics have filtered which units appear at all.
 
-We argue this is a feature for the intended application. For circular-economy policy, the
-quantity of interest is precisely how long products remain in productive use *within the
-market* — a Miele that serves one household for 17 years and is then discarded contributes
-differently to material flows than a Bosch that serves two households for 9 years each, and
-differently again from an Indesit that fails in year 6 and is landfilled. Lab endurance cannot
-distinguish these trajectories; BDP's signal pattern (S1, S3, and price behaviour jointly)
-can. The proxy should be read as a market-flow indicator complementary to, not competing
-with, type-approval-style lab testing.
+We argue this is a feature for the intended application, and the point deserves an
+illustration. Consider three machines. The first serves one household faithfully for
+seventeen years and goes to scrap without ever meeting a second owner. The second serves
+two households for nine years each, changing hands in the middle. The third fails in year
+six and is landfilled. A laboratory endurance rig cannot tell these three lives apart — on
+the test bench, the first machine is simply the best. But for material flows, for the
+circular economy's central ambition of keeping goods in use (Stahel, 2016), the three
+trajectories are entirely different objects, and it is the *market* record — who lists
+what, at what age, in what condition, at what price — that distinguishes them. The proxy
+should be read as a market-flow indicator complementary to, not competing with,
+type-approval-style lab testing; it measures the durability the economy actually receives,
+which the theory of §2.1 reminds us is an equilibrium outcome, not an engineering constant
+(Waldman, 2003).
 
 ## 5.4  Methodological contribution and transferability
 
@@ -155,16 +164,19 @@ brand. Listings in dialect or with sparse descriptions are the main failure mode
 
 ## 5.6  Policy implications
 
-For ESPR implementation and the Digital Product Passport, three implications follow. (i) A
-market-based durability indicator of this kind can be produced continuously and cheaply,
-making it suitable for *monitoring* — flagging brands or categories for targeted lab testing
-rather than replacing it. (ii) The double-penalty cluster (low durability, low repairability,
-low lab scores) is identifiable from public data alone; a screening rule at the observed gap
-in our composite (BDP_z < −2) isolates exactly the brands independent testing also ranks
-last. (iii) Because S2 mixes tested quality with brand equity, price-based instruments (e.g., VAT
-differentiation on secondhand goods) would advantage durable brands only imperfectly and
-would over-reward heavily marketed ones; stock-composition instruments target durability more
-cleanly.
+For ESPR implementation and the Digital Product Passport, three implications follow — and
+they are practical rather than utopian, which is perhaps the best that can be said of any
+policy implication. (i) A market-based durability indicator of this kind can be produced
+continuously and cheaply, making it suitable for *monitoring*: not a replacement for the
+laboratory, but a tireless assistant that reads the classifieds every month and tells the
+laboratory where to look (cf. Polverini, 2021, on the ecodesign framework's chronic
+shortage of verifiable durability metrics). (ii) The double-penalty cluster — low
+durability, low repairability, low lab scores — is identifiable from public data alone; a
+screening rule at the observed gap in our composite (BDP_z < −2) isolates exactly the
+brands independent testing also ranks last. (iii) Because S2 mixes tested quality with
+brand equity, price-based instruments (e.g., VAT differentiation on secondhand goods) would
+advantage durable brands only imperfectly and would over-reward the heavily marketed;
+stock-composition instruments target durability more cleanly.
 
 ## 5.7  Future work
 

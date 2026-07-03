@@ -243,7 +243,7 @@ is reported as significant when the bootstrap CI excludes zero. The full pipelin
 replication archive (`research/qualitydb_validation.py`).
 
 **Ex-ante interpretation note.** S1 and lab-tested endurance are *not* predicted to correlate
-strongly (hypothesis H3, §2.3). The survivor-selection mechanism implies that a lab-durable
+strongly (hypothesis H3, §2.5). The survivor-selection mechanism implies that a lab-durable
 brand whose machines are retained by primary owners until end-of-life shows a *lower* working
 share in resale listings than its lab durability would suggest (the retention pattern
 documented for Miele; Stiftung Warentest, 2018; Hennies & Stamminger, 2016), while adverse
