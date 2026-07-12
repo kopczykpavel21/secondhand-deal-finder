@@ -6,6 +6,7 @@ import {
   checkRateLimit,
   createCzechSearchCoordinator,
   enqueueSearchJob,
+  finalizeSearchResults,
   getSearchCache,
   getSearchJobResult,
   getSearchJobState,
@@ -57,6 +58,22 @@ function responseToCompleteEvent(response: SearchResponse) {
   };
 }
 
+/**
+ * Runs enrichment + price-history annotation on `complete` events before
+ * they are sent; other event types pass through untouched. Best-effort —
+ * a finalization failure must not kill the stream.
+ */
+async function finalizeEvent<T extends { type: string; results?: unknown[] }>(event: T): Promise<T> {
+  if (event.type === 'complete' && Array.isArray(event.results)) {
+    try {
+      await finalizeSearchResults(event.results as Parameters<typeof finalizeSearchResults>[0]);
+    } catch (err) {
+      console.error('[api/search/stream] finalize failed:', err);
+    }
+  }
+  return event;
+}
+
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache, no-transform',
@@ -95,7 +112,7 @@ export async function GET(req: NextRequest) {
       async start(controller) {
         try {
           for await (const event of inlineCoordinator.searchStream(searchRequest)) {
-            controller.enqueue(sseChunk(event));
+            controller.enqueue(sseChunk(await finalizeEvent(event)));
           }
         } catch (err) {
           controller.enqueue(sseChunk({ type: 'error', message: (err as Error).message }));
@@ -111,8 +128,8 @@ export async function GET(req: NextRequest) {
   const cached = await searchCache.get(createSearchCacheKey(searchRequest, 50, 100, 'cz'));
   if (cached) {
     return new Response(new ReadableStream({
-      start(controller) {
-        controller.enqueue(sseChunk(responseToCompleteEvent(cached)));
+      async start(controller) {
+        controller.enqueue(sseChunk(await finalizeEvent(responseToCompleteEvent(cached))));
         controller.close();
       },
     }), { headers: SSE_HEADERS });
@@ -124,7 +141,7 @@ export async function GET(req: NextRequest) {
       async start(controller) {
         try {
           for await (const event of inlineCoordinator.searchStream(searchRequest)) {
-            controller.enqueue(sseChunk(event));
+            controller.enqueue(sseChunk(await finalizeEvent(event)));
           }
         } catch (err) {
           controller.enqueue(sseChunk({ type: 'error', message: (err as Error).message }));
@@ -147,14 +164,14 @@ export async function GET(req: NextRequest) {
           if (events.length > 0) {
             cursor += events.length;
             for (const event of events) {
-              controller.enqueue(sseChunk(event));
+              controller.enqueue(sseChunk(await finalizeEvent(event)));
               if (event.type === 'complete' || event.type === 'error') return;
             }
           }
 
           const result = await getSearchJobResult(job.jobId);
           if (result) {
-            controller.enqueue(sseChunk(responseToCompleteEvent(result)));
+            controller.enqueue(sseChunk(await finalizeEvent(responseToCompleteEvent(result))));
             return;
           }
 

@@ -80,6 +80,29 @@ export interface ScoredListing extends NormalizedListing {
   scoreExplanation: string[];
   /** ID of deduplicated group when same item appears on multiple sources */
   dedupeGroup?: string;
+  /** Price movement vs. the last recorded snapshot (set when history exists) */
+  priceChange?: PriceChange;
+  /** True when detail-page enrichment has been applied */
+  enriched?: boolean;
+}
+
+/** Price movement computed from listing snapshot history */
+export interface PriceChange {
+  /** Price at the previous observation */
+  previousPrice: number;
+  /** Percent change vs. previous price; negative = price dropped */
+  changePct: number;
+  /** ISO date of the previous observation */
+  observedAt: string;
+}
+
+/** Extra fields obtainable from a listing's detail page */
+export interface ListingDetail {
+  description?: string | null;
+  conditionText?: string | null;
+  condition?: Condition;
+  views?: number | null;
+  sellerName?: string | null;
 }
 
 // ─── Scoring weights (all configurable) ──────────────────────────────────────
@@ -208,6 +231,12 @@ export interface SourceAdapter {
     NormalizedListing,
     'sellerName' | 'sellerRating' | 'sellerReviewCount'
   >;
+  /**
+   * Optional: fetch the listing's detail page for enrichment (full
+   * description, condition, views…). Implementations must be cheap (single
+   * HTTP GET) — used for the top results only.
+   */
+  fetchListingDetail?(listing: NormalizedListing): Promise<ListingDetail | null>;
 }
 
 export * from './market-config.js';

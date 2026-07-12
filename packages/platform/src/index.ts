@@ -34,6 +34,12 @@ export {
   createPolishSearchCoordinator,
   createProductionPolishSearchCoordinator,
 } from './polish-search';
+export { enrichTopResults } from './enrich';
+export {
+  annotatePriceHistory,
+  recordListingSnapshots,
+} from './listing-snapshots';
+export { finalizeSearchResults } from './search-finalizer';
 export {
   appendSearchJobEvent,
   claimSearchJob,

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createSearchCacheKey } from '@sdf/core';
-import type { Source } from '@sdf/types';
+import type { SearchResponse, Source } from '@sdf/types';
 import {
   checkRateLimit,
   createCzechSearchCoordinator,
   enqueueSearchJob,
+  finalizeSearchResults,
   getSearchCache,
   getSearchJobResult,
   getSearchJobState,
@@ -44,6 +45,24 @@ function clientIdentifier(req: NextRequest): string {
     req.headers.get('x-real-ip') ??
     'anonymous'
   );
+}
+
+/** Enrich + price-history-annotate results, then wrap in a JSON response. */
+async function respondWithResults(
+  result: SearchResponse,
+  sMaxAge = 60,
+  staleWhileRevalidate = 300,
+): Promise<NextResponse> {
+  try {
+    await finalizeSearchResults(result.results);
+  } catch (err) {
+    console.error('[api/search] finalize failed:', err);
+  }
+  return NextResponse.json(result, {
+    headers: {
+      'Cache-Control': `public, s-maxage=${sMaxAge}, stale-while-revalidate=${staleWhileRevalidate}`,
+    },
+  });
 }
 
 async function waitForJobResult(jobId: string, timeoutMs: number): Promise<Awaited<ReturnType<typeof getSearchJobResult>>> {
@@ -101,30 +120,18 @@ export async function GET(req: NextRequest) {
 
     if (debug || !isWorkerSearchEnabled()) {
       const result = await inlineCoordinator.search(searchRequest);
-      return NextResponse.json(result, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-        },
-      });
+      return respondWithResults(result);
     }
 
     const cached = await searchCache.get(createSearchCacheKey(searchRequest, 50, 100, 'cz'));
     if (cached) {
-      return NextResponse.json(cached, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-        },
-      });
+      return respondWithResults(cached);
     }
 
     const job = await enqueueSearchJob('cz', searchRequest);
     if (!job) {
       const result = await inlineCoordinator.search(searchRequest);
-      return NextResponse.json(result, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-        },
-      });
+      return respondWithResults(result);
     }
 
     const result = await waitForJobResult(
@@ -134,18 +141,10 @@ export async function GET(req: NextRequest) {
 
     if (!result) {
       const fallback = await inlineCoordinator.search(searchRequest);
-      return NextResponse.json(fallback, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
-        },
-      });
+      return respondWithResults(fallback, 30, 120);
     }
 
-    return NextResponse.json(result, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
-      },
-    });
+    return respondWithResults(result);
   } catch (err) {
     console.error('[api/search] Unhandled error:', err);
     return NextResponse.json({ error: 'Vyhledávání selhalo' }, { status: 500 });

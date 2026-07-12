@@ -235,6 +235,22 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
               <span className="font-bold text-slate-900 text-base sm:text-lg">
                 {formatPrice(listing.price, listing.currency)}
               </span>
+              {listing.priceChange && (
+                <span
+                  title={`Dříve ${formatPrice(listing.priceChange.previousPrice, listing.currency)} (${new Date(listing.priceChange.observedAt).toLocaleDateString('cs-CZ')})`}
+                  className={clsx(
+                    'text-xs font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5',
+                    listing.priceChange.changePct < 0
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-orange-50 text-orange-600',
+                  )}
+                >
+                  {listing.priceChange.changePct < 0 ? '↓' : '↑'}
+                  {' '}
+                  {listing.priceChange.changePct < 0 ? 'zlevněno o ' : 'zdraženo o '}
+                  {Math.abs(listing.priceChange.changePct).toFixed(0)} %
+                </span>
+              )}
             </div>
           </div>
 

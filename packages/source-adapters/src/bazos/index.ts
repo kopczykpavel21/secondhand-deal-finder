@@ -25,7 +25,7 @@
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
-import type { AdapterConfig, NormalizedListing, SearchFilters } from '@sdf/types';
+import type { AdapterConfig, ListingDetail, NormalizedListing, SearchFilters } from '@sdf/types';
 import { BaseAdapter } from '../base-adapter.js';
 
 const BASE_URL = 'https://www.bazos.cz';
@@ -236,6 +236,44 @@ export class BazosAdapter extends BaseAdapter {
 
     this.log(`Total unique results: ${results.length}`);
     return results;
+  }
+
+  /**
+   * Detail-page enrichment: fetches the listing page and extracts the FULL
+   * description (search results truncate it), views, and seller name.
+   * Structure (confirmed live 2026-07):
+   *   <div class="popisdetail">FULL DESCRIPTION</div>
+   *   <div class="inzeratyview">123 x</div>
+   *   Jméno:…<span onclick="odeslatakci('rating',…)" class="paction">NAME</span>
+   */
+  async fetchListingDetail(listing: NormalizedListing): Promise<ListingDetail | null> {
+    const html = await this.fetchHtml(listing.url);
+
+    const descMatch = html.match(/class="?popisdetail"?[^>]*>([\s\S]*?)<\/div>/i);
+    const description = descMatch ? stripTags(descMatch[1]) || null : null;
+
+    const viewsRaw = extractQuotedClass(html, 'inzeratyview');
+    const viewsMatch = viewsRaw ? stripTags(viewsRaw).match(/(\d+)/) : null;
+    const views = viewsMatch ? parseInt(viewsMatch[1], 10) : null;
+
+    // Only the rating-action span carries the real seller name — generic
+    // .paction elements include unrelated link captions ("Další inzeráty zde").
+    const sellerMatch = html.match(/odeslatakci\('rating'[^>]*class="paction"[^>]*>([^<]{1,80})</i);
+    const sellerName = sellerMatch ? decodeEntities(sellerMatch[1]).trim() || null : null;
+
+    // Full description often carries condition wording the truncated search
+    // snippet missed ("top stav", "na díly"…).
+    const conditionText = description ? this.inferConditionFromTitle(description) : null;
+
+    if (!description && views === null && !sellerName) return null;
+
+    return {
+      description,
+      conditionText,
+      condition: conditionText ? this.inferCondition(conditionText) : undefined,
+      views,
+      sellerName,
+    };
   }
 
   private async fetchHtml(url: string): Promise<string> {
