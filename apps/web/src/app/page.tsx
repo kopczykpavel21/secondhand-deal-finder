@@ -112,13 +112,13 @@ export default function HomePage() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-brand-100 text-brand-700 text-xs font-semibold px-3 py-1 rounded-full mb-4">
             <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse" />
-            Beta · Bazoš · Vinted · Aukro · Fler
+            Beta · Bazoš · Sbazar · Vinted · Aukro · Fler · TipCars
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
             Z druhé ruky
           </h1>
           <p className="mt-2 text-slate-500 text-base sm:text-lg max-w-md mx-auto">
-            Prohledáme Bazoš, Vinted, Aukro a Fler najednou a seřadíme výsledky podle skutečné hodnoty.
+            Prohledáme Bazoš, Sbazar, Vinted, Aukro, Fler a TipCars najednou a seřadíme výsledky podle skutečné hodnoty.
           </p>
         </div>
 
@@ -294,7 +294,7 @@ export default function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <p className="font-medium text-slate-400">Napište co hledáte</p>
-            <p className="text-sm text-slate-300">Prohledáme Bazoš, Vinted, Aukro a Fler najednou.</p>
+            <p className="text-sm text-slate-300">Prohledáme Bazoš, Sbazar, Vinted, Aukro, Fler a TipCars najednou.</p>
           </div>
         )}
       </main>

@@ -39,7 +39,9 @@ export default function FeedbackAdminPage() {
 
   async function load() {
     try {
-      const res = await fetch('/api/feedback');
+      // Forward ?key= to the API — required when ADMIN_KEY is set in production.
+      const key = new URLSearchParams(window.location.search).get('key');
+      const res = await fetch(`/api/feedback${key ? `?key=${encodeURIComponent(key)}` : ''}`);
       if (!res.ok) throw new Error('failed');
       setData(await res.json() as Summary);
     } catch {

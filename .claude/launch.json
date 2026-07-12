@@ -3,14 +3,14 @@
   "configurations": [
     {
       "name": "web (Czech)",
-      "runtimeExecutable": "/Users/Pavel/.nvm/versions/node/v20.20.2/bin/npm",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
       "runtimeArgs": ["run", "dev", "--workspace=apps/web"],
       "port": 3000,
       "autoPort": true
     },
     {
       "name": "web-de (German)",
-      "runtimeExecutable": "/Users/Pavel/.nvm/versions/node/v20.20.2/bin/npm",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
       "runtimeArgs": ["run", "dev", "--workspace=apps/web-de"],
       "port": 3001,
       "autoPort": true

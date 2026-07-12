@@ -43,6 +43,17 @@ class DeferredQueue<T> {
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
+// Listings scoring below this relevance are dropped entirely. The accessory
+// guard caps spare-part/accessory listings at 0.05 ("Kryt pro iPhone 13",
+// "Nárazník Škoda Octavia"), and completely unrelated listings score 0 —
+// without a floor both still appear in results and dominate the "cheapest"
+// sort. A one-of-three token match scores ≥ 0.33, so genuine results pass.
+const MIN_RELEVANCE = 0.1;
+
+function dropIrrelevant(listings: ScoredListing[]): ScoredListing[] {
+  return listings.filter((l) => l.scoreComponents.relevance >= MIN_RELEVANCE);
+}
+
 // Hard wall-clock limit per source adapter.  Playwright adapters (Sbazar,
 // Vinted) can retry internally up to 2×, so keep this above 2 × 20 s = 40 s.
 // HTTP adapters (Bazoš, Aukro) finish in < 5 s so the timeout never triggers.
@@ -124,7 +135,7 @@ export class SearchCoordinator {
 
     // Score all listings (use relevance-heavy weights when requested)
     const weights = getWeightsForSort(filters?.sortBy);
-    const scored = scoreListings(deduped, query, weights, this.marketConfig);
+    const scored = dropIrrelevant(scoreListings(deduped, query, weights, this.marketConfig));
 
     // Post-scoring dedup: keep only the highest-scored listing per duplicate group
     const dedupeFiltered = removeScoredDuplicates(scored, dedupeGroups);
@@ -221,7 +232,7 @@ export class SearchCoordinator {
 
       // Re-score everything accumulated so far
       const { listings: deduped, groups } = deduplicateListings(allListings, this.marketConfig.priceBucketSize);
-      const scored = scoreListings(deduped, query, weights, this.marketConfig);
+      const scored = dropIrrelevant(scoreListings(deduped, query, weights, this.marketConfig));
       const filtered = removeScoredDuplicates(scored, groups);
       const sorted = sortResults(filtered, filters?.sortBy ?? 'best_deal');
 
@@ -237,7 +248,7 @@ export class SearchCoordinator {
 
     // Final event with complete metadata
     const { listings: deduped, groups } = deduplicateListings(allListings, this.marketConfig.priceBucketSize);
-    const scored = scoreListings(deduped, query, weights, this.marketConfig);
+    const scored = dropIrrelevant(scoreListings(deduped, query, weights, this.marketConfig));
     const filtered = removeScoredDuplicates(scored, groups);
     const sorted = sortResults(filtered, filters?.sortBy ?? 'best_deal');
 
@@ -384,9 +395,11 @@ function sortResults(listings: ScoredListing[], sortBy: SortOption): ScoredListi
       });
     case 'cheapest':
       return [...listings].sort((a, b) => {
-        if (a.price === null) return 1;
-        if (b.price === null) return -1;
-        return a.price - b.price;
+        // null/zero price = "price in description / on request" — sort last,
+        // those listings are not actually free.
+        const pa = a.price !== null && a.price > 0 ? a.price : Infinity;
+        const pb = b.price !== null && b.price > 0 ? b.price : Infinity;
+        return pa - pb;
       });
     case 'priciest':
       return [...listings].sort((a, b) => {

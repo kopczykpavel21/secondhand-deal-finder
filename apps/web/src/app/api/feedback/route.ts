@@ -47,8 +47,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/feedback — used by admin page
-export async function GET() {
+// GET /api/feedback — used by admin page.
+// When ADMIN_KEY is set (production), the key must be supplied via the
+// x-admin-key header or ?key= query param — feedback entries contain e-mail
+// addresses and must not be publicly listable.
+export async function GET(req: NextRequest) {
+  const adminKey = process.env.ADMIN_KEY;
+  if (adminKey) {
+    const supplied = req.headers.get('x-admin-key') ?? req.nextUrl.searchParams.get('key');
+    if (supplied !== adminKey) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+  }
+
   const responses = await listFeedbackEntries();
   const avg = responses.length > 0
     ? (responses.reduce((s, r) => s + r.rating, 0) / responses.length).toFixed(1)

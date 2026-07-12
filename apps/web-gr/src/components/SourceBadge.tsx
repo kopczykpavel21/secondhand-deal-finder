@@ -35,6 +35,11 @@ const SOURCE_META: Record<
     color: 'bg-pink-50 text-pink-700 border-pink-200',
     dot: 'bg-pink-500',
   },
+  tipcars: {
+    label: 'TipCars',
+    color: 'bg-slate-50 text-slate-700 border-slate-200',
+    dot: 'bg-slate-500',
+  },
   mock: {
     label: 'Demo',
     color: 'bg-slate-100 text-slate-600 border-slate-200',

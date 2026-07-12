@@ -137,6 +137,33 @@ const DEFAULT_FOR_PREPOSITIONS = [
   'pro', 'na', 'for', 'k', 'do', 'kompatibilni', 'compatible',
 ];
 
+// Tokens that only appear in whole-vehicle titles ("Škoda Octavia 2.0 TDI
+// 110kW DSG"), never in spare-part listings. When one is present, the
+// product-then-accessory pattern (d) is skipped, so a car advertised with
+// bonus wheels ("… 2x kola, zimní pneu") is not misclassified as a part.
+// Noun-led patterns (b)/(c) ("Alu kola pro Octavii") still apply.
+const WHOLE_ITEM_SPEC_TOKENS = new Set([
+  // cars — engine/drivetrain specs
+  'tdi', 'tsi', 'mpi', 'dsg', 'kw', 'hdi', 'dci', 'cdti', 'crdi', 'tgi',
+  'tfsi', 'vtec', 'cvt', 'xdrive', 'quattro', '4x4', '4matic', 'awd',
+  // electronics — storage size ("128 GB") marks a whole device, not a part
+  'gb', 'tb',
+]);
+
+/**
+ * Accessory-noun matching. Entries ending in "*" are STEMS matched by prefix,
+ * covering Czech declensions — "svetl*" matches svetlo / svetla / svetel /
+ * svetlomet. All other entries match exactly, so "motor" cannot swallow
+ * "motorka" and "band" cannot swallow "bandage".
+ */
+function isAccessoryNounToken(token: string, nouns: Set<string>): boolean {
+  if (nouns.has(token)) return true;
+  for (const noun of nouns) {
+    if (noun.endsWith('*') && token.startsWith(noun.slice(0, -1))) return true;
+  }
+  return false;
+}
+
 /**
  * Returns true when the title is an accessory listed "for" the queried product.
  *
@@ -154,7 +181,7 @@ function isAccessoryForQuery(
   if (titleTokens.length < 2 || queryTokens.length === 0) return false;
 
   // (a) Title must start with an accessory noun (first 2 tokens)
-  const accessoryLeadIdx = titleTokens.slice(0, 2).findIndex((t) => accessoryHeadNouns.has(t));
+  const accessoryLeadIdx = titleTokens.slice(0, 2).findIndex((t) => isAccessoryNounToken(t, accessoryHeadNouns));
 
   if (accessoryLeadIdx !== -1) {
     const afterLead = titleTokens.slice(accessoryLeadIdx + 1);
@@ -169,30 +196,29 @@ function isAccessoryForQuery(
       if (matchedAfterPrep.length >= Math.ceil(queryTokens.length * 0.5)) return true;
     }
 
-    // (c) All query tokens appear directly after the accessory noun (no preposition)
-    const allQueryTokensAfterLead = queryTokens.every((qt) =>
+    // (c) Most query tokens appear directly after the accessory noun (no
+    // preposition) — majority (not all), so "Disky Octavia II" still caps a
+    // "škoda octavia" query even though the title omits the brand.
+    const matchedAfterLead = queryTokens.filter((qt) =>
       afterLead.some((tt) => tokenMatches(tt, qt)),
     );
-    if (allQueryTokensAfterLead) return true;
+    if (matchedAfterLead.length >= Math.ceil(queryTokens.length * 0.5)) return true;
   }
 
-  // (d) Product-then-accessory pattern: "iPhone 13 kryt", "Apple Watch remínek Nike"
-  // Find the last position in titleTokens that matches a query token
-  let lastQueryTokenPos = -1;
-  for (let i = 0; i < titleTokens.length; i++) {
-    if (queryTokens.some((qt) => tokenMatches(titleTokens[i], qt))) {
-      lastQueryTokenPos = i;
-    }
-  }
-  if (lastQueryTokenPos >= 0 && lastQueryTokenPos < titleTokens.length - 1) {
-    const afterProduct = titleTokens.slice(lastQueryTokenPos + 1);
-    if (afterProduct.some((t) => accessoryHeadNouns.has(t))) {
-      // Verify query tokens form the title's opening section (not just scattered matches)
-      const queryMatchedBefore = queryTokens.filter((qt) =>
-        titleTokens.slice(0, lastQueryTokenPos + 1).some((tt) => tokenMatches(tt, qt)),
-      );
-      if (queryMatchedBefore.length >= Math.ceil(queryTokens.length * 0.7)) return true;
-    }
+  // (d) Accessory noun anywhere in the title — real Czech listings bury the
+  // part noun mid-title ("Levý přední blatník Škoda Octavia 2", "originální
+  // OEM displej Škoda Octavia 4"), so positional patterns miss them.
+  // Titles carrying whole-item spec tokens are exempt: a car advertised as
+  // "2.0 TDI 110kW … + zimní kola" or a phone as "128 GB … + kryt" is the
+  // product itself, not a part (noun-LED titles above cap regardless —
+  // "Motor 1.9 TDI z Škoda Octavia" is still a part).
+  if (titleTokens.some((t) => WHOLE_ITEM_SPEC_TOKENS.has(t))) return false;
+
+  if (titleTokens.some((t) => isAccessoryNounToken(t, accessoryHeadNouns))) {
+    const matched = queryTokens.filter((qt) =>
+      titleTokens.some((tt) => tokenMatches(tt, qt)),
+    );
+    if (matched.length >= Math.ceil(queryTokens.length * 0.5)) return true;
   }
 
   return false;
@@ -251,12 +277,16 @@ function levenshtein(a: string, b: string): number {
 
 /**
  * Returns true when dt (document token) matches qt (query token).
- * Numeric tokens must match exactly. Text tokens use substring match first,
- * then fall back to Levenshtein ≤ 1 for longer tokens.
+ * Numeric tokens must match exactly. Text tokens use substring match with
+ * minimum lengths — without them the title token "a" would match the query
+ * token "octavia" ('octavia'.includes('a')) and every Czech conjunction
+ * would count as a query hit. Falls back to Levenshtein ≤ 1 for longer tokens.
  */
 function tokenMatches(dt: string, qt: string): boolean {
   if (isNumeric(qt)) return dt === qt;
-  if (dt.includes(qt) || qt.includes(dt)) return true;
+  if (dt === qt) return true;
+  if (qt.length >= 3 && dt.includes(qt)) return true;
+  if (dt.length >= 4 && qt.includes(dt)) return true;
   if (qt.length >= 5 && dt.length >= 5) return levenshtein(dt, qt) <= 1;
   return false;
 }
@@ -307,7 +337,7 @@ export function scoreRelevance(
   const titleTokens = tokenize(title);
 
   // ── Accessory guard ───────────────────────────────────────────────────────
-  const queryMentionsAccessory = queryTokens.some((t) => accessoryHeadNouns.has(t));
+  const queryMentionsAccessory = queryTokens.some((t) => isAccessoryNounToken(t, accessoryHeadNouns));
   if (!queryMentionsAccessory && isAccessoryForQuery(titleTokens, queryTokens, accessoryHeadNouns, forPrepositions)) {
     return 0.05;
   }

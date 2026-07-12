@@ -16,10 +16,6 @@ function decodeEntities(value: string): string {
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
 }
 
-function stripTags(value: string): string {
-  return decodeEntities(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
-}
-
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
@@ -44,8 +40,6 @@ function toSlug(value: string): string {
 function extractStructuredObjects(html: string): Record<string, unknown>[] {
   const scripts = [
     ...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-    ...html.matchAll(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/gi),
-    ...html.matchAll(/<script[^>]*>\s*window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\})\s*;?\s*<\/script>/gi),
   ];
 
   const out: Record<string, unknown>[] = [];
@@ -101,39 +95,35 @@ function firstImage(value: unknown): string | null {
   );
 }
 
-function parseTipCarsDate(raw: string | null): Date | null {
-  if (!raw) return null;
-  const iso = new Date(raw);
-  if (!Number.isNaN(iso.getTime())) return iso;
-
-  const match = raw.match(/(\d{1,2})\/(\d{4})/);
+function parseFuelFromPath(url: string): string | null {
+  const match = url.match(/\/(benzin|nafta|diesel|hybrid|elektro|lpg|cng)\//i);
   if (!match) return null;
-  return new Date(Number(match[2]), Number(match[1]) - 1, 1);
-}
-
-function parseFuel(text: string | null): string | null {
-  if (!text) return null;
-  const lower = text.toLowerCase();
-  if (lower.includes('nafta')) return 'nafta';
-  if (lower.includes('benzin') || lower.includes('benzin')) return 'benzin';
-  if (lower.includes('hybrid')) return 'hybrid';
-  if (lower.includes('elektro')) return 'elektro';
-  if (lower.includes('lpg')) return 'lpg';
-  if (lower.includes('cng')) return 'cng';
-  return null;
-}
-
-function parseTransmission(text: string | null): string | null {
-  if (!text) return null;
-  const lower = text.toLowerCase();
-  if (lower.includes('automat')) return 'automat';
-  if (lower.includes('manu')) return 'manuál';
-  return null;
+  const fuel = match[1].toLowerCase();
+  return fuel === 'diesel' ? 'nafta' : fuel;
 }
 
 function stableFallbackId(value: string): string {
   return createHash('sha1').update(value).digest('hex').slice(0, 16);
 }
+
+// Common model → brand slug prefixes, so a bare-model query ("octavia")
+// still resolves to a valid TipCars listing page (/skoda-octavia).
+const MODEL_BRANDS: Record<string, string> = {
+  octavia: 'skoda', fabia: 'skoda', superb: 'skoda', kodiaq: 'skoda',
+  karoq: 'skoda', kamiq: 'skoda', scala: 'skoda', rapid: 'skoda',
+  citigo: 'skoda', roomster: 'skoda', yeti: 'skoda', felicia: 'skoda',
+  enyaq: 'skoda',
+  golf: 'volkswagen', passat: 'volkswagen', polo: 'volkswagen',
+  tiguan: 'volkswagen', touran: 'volkswagen', caddy: 'volkswagen',
+  transporter: 'volkswagen', arteon: 'volkswagen', touareg: 'volkswagen',
+  focus: 'ford', fiesta: 'ford', mondeo: 'ford', kuga: 'ford',
+  astra: 'opel', corsa: 'opel', insignia: 'opel', zafira: 'opel',
+  megane: 'renault', clio: 'renault', scenic: 'renault', kadjar: 'renault',
+  civic: 'honda', accord: 'honda', 'cr-v': 'honda', crv: 'honda',
+  corolla: 'toyota', yaris: 'toyota', rav4: 'toyota', avensis: 'toyota',
+  i30: 'hyundai', tucson: 'hyundai', ceed: 'kia', sportage: 'kia',
+  qashqai: 'nissan', duster: 'dacia', sandero: 'dacia', logan: 'dacia',
+};
 
 export class TipCarsAdapter extends BaseAdapter {
   source = 'tipcars' as const;
@@ -147,38 +137,82 @@ export class TipCarsAdapter extends BaseAdapter {
     return `${BASE_URL}/${toSlug(query)}`;
   }
 
+  /**
+   * TipCars only serves listing pages at /{brand} or /{brand}-{model} slugs
+   * (e.g. /skoda, /skoda-octavia). There is no public fulltext search URL, so
+   * we try the full slugified query first, then progressively drop trailing
+   * tokens ("skoda octavia 2015" → /skoda-octavia-2015 → /skoda-octavia →
+   * /skoda). Non-car queries simply 404 on every candidate and yield [].
+   */
+  private candidateSlugs(query: string): string[] {
+    const slug = toSlug(query);
+    if (!slug) return [];
+    const tokens = slug.split('-');
+    const candidates: string[] = [];
+
+    // Bare-model query ("octavia", "octavia 2015") → prepend the brand.
+    const brand = MODEL_BRANDS[tokens[0]];
+    if (brand && tokens[0] !== brand) {
+      candidates.push(`${brand}-${tokens[0]}`);
+    }
+
+    candidates.push(slug);
+    for (let n = tokens.length - 1; n >= 1; n--) {
+      const candidate = tokens.slice(0, n).join('-');
+      if (!candidates.includes(candidate)) candidates.push(candidate);
+    }
+    return candidates.slice(0, 4);
+  }
+
   async searchListings(query: string, filters?: SearchFilters): Promise<NormalizedListing[]> {
     return this.withRetry(() => this.fetchListings(query, filters), 'tipcars.search');
   }
 
   private async fetchListings(query: string, filters?: SearchFilters): Promise<NormalizedListing[]> {
-    const url = this.buildSearchUrl(query, filters);
-    this.log(`Fetching: ${url}`);
+    for (const slug of this.candidateSlugs(query)) {
+      const url = `${BASE_URL}/${slug}`;
+      this.log(`Fetching: ${url}`);
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': this.config.userAgent,
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'cs-CZ,cs;q=0.9,en;q=0.8',
-        'Cache-Control': 'no-cache',
-      },
-      signal: AbortSignal.timeout(this.config.timeout),
-    });
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': this.config.userAgent,
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'cs-CZ,cs;q=0.9,en;q=0.8',
+          'Cache-Control': 'no-cache',
+        },
+        signal: AbortSignal.timeout(this.config.timeout),
+      });
 
-    if (!response.ok) {
-      throw new Error(`TipCars HTTP ${response.status}`);
+      // Unknown slug (non-car query, model without brand…) — try the next candidate.
+      if (response.status === 404) {
+        this.log(`404 for slug "${slug}"`);
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`TipCars HTTP ${response.status}`);
+      }
+
+      const html = await response.text();
+
+      const structured = this.parseStructured(html);
+      if (structured.length > 0) {
+        this.log(`Structured parse returned ${structured.length} listings`);
+        return this.applyFilters(structured, filters);
+      }
+
+      const cards = this.parseCards(html);
+      this.log(`Card parse returned ${cards.length} listings`);
+      if (cards.length > 0) {
+        return this.applyFilters(cards, filters);
+      }
+      // 200 page with no cards (empty result page) — a shorter slug won't be
+      // more specific to the query, so stop here.
+      return [];
     }
 
-    const html = await response.text();
-    const structured = this.parseStructured(html);
-    if (structured.length > 0) {
-      this.log(`Structured parse returned ${structured.length} listings`);
-      return this.applyFilters(structured, filters);
-    }
-
-    const fallback = this.parseFallback(html);
-    this.log(`Fallback parse returned ${fallback.length} listings`);
-    return this.applyFilters(fallback, filters);
+    this.log('No matching TipCars slug for query — returning 0 listings');
+    return [];
   }
 
   private applyFilters(listings: NormalizedListing[], filters?: SearchFilters): NormalizedListing[] {
@@ -195,20 +229,15 @@ export class TipCarsAdapter extends BaseAdapter {
     const seen = new Set<string>();
 
     for (const obj of extractStructuredObjects(html)) {
+      // Only vehicle/product/offer-ish objects carry listings; site chrome
+      // (WebSite, Organization) has no price and is skipped below.
       const rawUrl = normalizeUrl(
         asString(obj.url) ??
         asString(obj.href) ??
         asString(obj.link)
       );
       const title = decodeEntities(asString(obj.name) ?? asString(obj.title) ?? '');
-      if (!rawUrl || !title || !/tipcars\.com|^\/|^[a-z0-9-]+$/i.test(rawUrl)) continue;
-
-      const listingId =
-        asString(obj.id) ??
-        this.extractListingId(rawUrl) ??
-        stableFallbackId(rawUrl);
-      if (seen.has(listingId)) continue;
-      seen.add(listingId);
+      if (!rawUrl || !title) continue;
 
       const offers = (obj.offers as Record<string, unknown> | undefined) ?? {};
       const price =
@@ -217,6 +246,13 @@ export class TipCarsAdapter extends BaseAdapter {
         extractPrice(obj.price);
       if (price == null) continue;
 
+      const listingId =
+        asString(obj.id) ??
+        this.extractListingId(rawUrl) ??
+        stableFallbackId(rawUrl);
+      if (seen.has(listingId)) continue;
+      seen.add(listingId);
+
       const description = decodeEntities(asString(obj.description) ?? '') || null;
       const yearText =
         asString(obj.productionDate) ??
@@ -224,34 +260,22 @@ export class TipCarsAdapter extends BaseAdapter {
         asString(obj.modelDate) ??
         asString(obj.dateVehicleFirstRegistered) ??
         null;
-      const mileageText =
-        asString(obj.mileageFromOdometer) ??
-        asString(obj.mileage) ??
-        asString(obj.distance) ??
-        null;
-      const fuelText =
-        asString(obj.fuelType) ??
-        asString(obj.fuel) ??
-        null;
-      const transmissionText =
-        asString(obj.vehicleTransmission) ??
-        asString(obj.transmission) ??
-        null;
       const location =
         decodeEntities(
           asString((obj.address as Record<string, unknown> | undefined)?.addressLocality) ??
           asString(obj.location) ??
-          asString(obj.sellerLocation) ??
           ''
         ) || null;
       const sellerName =
         decodeEntities(
-          asString((obj.brand as Record<string, unknown> | undefined)?.name) ??
           asString((obj.seller as Record<string, unknown> | undefined)?.name) ??
           asString((obj.provider as Record<string, unknown> | undefined)?.name) ??
           asString(obj.sellerName) ??
           ''
         ) || null;
+
+      const postedAtText = asString(obj.datePosted) ?? asString(obj.dateCreated);
+      const postedAt = postedAtText ? this.safeDate(postedAtText) : null;
 
       results.push({
         id: this.makeId(listingId),
@@ -263,7 +287,7 @@ export class TipCarsAdapter extends BaseAdapter {
         price,
         currency: 'CZK',
         location,
-        postedAt: parseTipCarsDate(asString(obj.datePosted) ?? asString(obj.dateCreated) ?? yearText),
+        postedAt,
         conditionText: null,
         condition: this.inferCondition(null),
         imageCount: firstImage(obj.image) ? 1 : 0,
@@ -277,11 +301,9 @@ export class TipCarsAdapter extends BaseAdapter {
         promoted: this.detectPromoted(obj),
         rawMetadata: {
           yearText,
-          mileageText,
-          fuelText,
-          transmissionText,
-          bodyType: asString(obj.bodyType),
-          powerText: asString(obj.vehicleEnginePower) ?? asString(obj.power),
+          mileageText: asString(obj.mileageFromOdometer) ?? asString(obj.mileage),
+          fuelText: asString(obj.fuelType) ?? asString(obj.fuel),
+          transmissionText: asString(obj.vehicleTransmission) ?? asString(obj.transmission),
         },
       });
     }
@@ -289,69 +311,90 @@ export class TipCarsAdapter extends BaseAdapter {
     return results;
   }
 
-  private parseFallback(html: string): NormalizedListing[] {
+  /**
+   * Parses the server-rendered listing cards. Each card lives in a
+   * `advertisement__row` container:
+   *   <div class="advertisement__row">
+   *     <picture>…<img src="https://g.tipcars.com/…" …></picture>
+   *     <section class="advertisement-name">
+   *       <section class="advertisement-name__title">
+   *         <a href="/skoda-octavia/liftback/benzin/…-9803869.html"
+   *            data-offer-listing-id-param="9803869"><h3>Škoda Octavia</h3></a>
+   *         <p class="text-M">1.5 TSI Top selection</p>
+   *       </section>
+   *       <section class="advertisement-name__price">
+   *         <h3 class="text-h3 highlighted"> 574 000 Kč </h3>
+   *       </section>
+   *     </section>
+   *     …
+   *   </div>
+   * The name section is rendered twice (desktop + mobile) — dedupe by id.
+   */
+  private parseCards(html: string): NormalizedListing[] {
     const results: NormalizedListing[] = [];
     const seen = new Set<string>();
 
-    const blocks = html.split(/fotografie inzerátu/gi).slice(1);
-    for (const block of blocks) {
-      const snippet = block.slice(0, 3000);
-      const titleMatch =
-        snippet.match(/>\s*(Škoda|Skoda|Volkswagen|Ford|Hyundai|Toyota|BMW|Mercedes-Benz|Mercedes|Audi|Renault|Peugeot|Kia|Opel|Dacia)\s+([^<]{1,80})</i) ??
-        snippet.match(/title="([^"]{4,120})"/i);
-      const title = titleMatch
-        ? stripTags(titleMatch[0].replace(/^>/, '').replace(/<$/, '')).replace(/\s{2,}/g, ' ')
-        : null;
-      if (!title) continue;
+    const rows = html.split(/class="advertisement__row"/).slice(1);
+    for (const row of rows) {
+      const listingId =
+        row.match(/data-offer-listing-id-param="(\d+)"/)?.[1] ??
+        this.extractListingId(row.match(/href="([^"]+\.html)"/)?.[1] ?? '') ??
+        null;
+      if (!listingId || seen.has(listingId)) continue;
 
-      const hrefMatch = snippet.match(/href="([^"]+)"/i);
-      const rawUrl = normalizeUrl(hrefMatch?.[1] ?? null);
-      if (!rawUrl) continue;
+      const href = row.match(/href="([^"]+\.html)"/)?.[1] ?? null;
+      const url = normalizeUrl(href);
+      if (!url) continue;
 
-      const listingId = this.extractListingId(rawUrl) ?? stableFallbackId(rawUrl);
-      if (seen.has(listingId)) continue;
-      seen.add(listingId);
+      const titleMatch = row.match(/advertisement-name__title[\s\S]{0,600}?<h3>\s*([^<]+?)\s*<\/h3>/);
+      const baseTitle = titleMatch ? decodeEntities(titleMatch[1]).trim() : null;
+      if (!baseTitle) continue;
 
-      const priceMatch = snippet.match(/###\s*([\d\s]+)\s*Kč/i);
+      const subtitle = decodeEntities(row.match(/<p class="text-M">([^<]*)<\/p>/)?.[1] ?? '').trim();
+      const title = subtitle ? `${baseTitle} ${subtitle}` : baseTitle;
+
+      const priceMatch = row.match(/text-h3 highlighted">\s*([\d\s ]+)\s*Kč/);
       const price = extractPrice(priceMatch?.[1] ?? null);
       if (price == null) continue;
 
-      const yearText = snippet.match(/\b(\d{1,2}\/\d{4}|\d{4})\b/)?.[1] ?? null;
-      const mileageText = snippet.match(/(\d[\d\s]{2,})\s*km/i)?.[1] ?? null;
-      const powerText = snippet.match(/(\d[\d\s]{1,3})\s*kW/i)?.[1] ?? null;
-      const fuelText = snippet.match(/\b(nafta|benzin|hybrid|elektro|lpg|cng)\b/i)?.[1] ?? null;
-      const transmissionText = snippet.match(/\b(automat|manuál|manual)\b/i)?.[1] ?? null;
-      const sellerName = snippet.match(/\b([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][^<\n]{2,80})\s*$/m)?.[1] ?? null;
-      const description = stripTags((snippet.match(/Kč[\s\S]{0,1200}/i)?.[0] ?? '').replace(/Kč/i, '')).trim() || null;
+      seen.add(listingId);
+
+      const imageUrl = normalizeUrl(row.match(/<img[^>]+src="(https:\/\/g\.tipcars\.com[^"]+)"/)?.[1] ?? null);
+      const yearText = row.match(/\b(\d{1,2}\/\d{4})\b/)?.[1] ?? null;
+      const mileageText = row.match(/([\d][\d\s ]{2,})\s*km\b/i)?.[1]?.replace(/[\s ]/g, '') ?? null;
+      const fuelText = href ? parseFuelFromPath(href) : null;
+
+      const detailBits = [yearText, mileageText ? `${mileageText} km` : null, fuelText]
+        .filter(Boolean)
+        .join(', ');
 
       results.push({
         id: this.makeId(listingId),
         source: 'tipcars',
         sourceListingId: listingId,
-        url: rawUrl,
+        url,
         title,
-        description,
+        description: detailBits || null,
         price,
         currency: 'CZK',
         location: null,
-        postedAt: parseTipCarsDate(yearText),
+        // yearText is the manufacture date, not the posting date — leave null.
+        postedAt: null,
         conditionText: null,
         condition: this.inferCondition(null),
-        imageCount: 1,
-        imageUrl: null,
-        sellerName,
+        imageCount: imageUrl ? 1 : 0,
+        imageUrl,
+        sellerName: null,
         sellerRating: null,
         sellerReviewCount: null,
         views: null,
         likes: null,
         shippingAvailable: false,
-        promoted: this.detectPromoted({ snippet }),
+        promoted: this.detectPromoted({ snippet: row.slice(0, 2000) }),
         rawMetadata: {
           yearText,
           mileageText,
-          powerText,
-          fuelText: parseFuel(fuelText),
-          transmissionText: parseTransmission(transmissionText),
+          fuelText,
         },
       });
     }
@@ -361,6 +404,7 @@ export class TipCarsAdapter extends BaseAdapter {
 
   private extractListingId(url: string): string | null {
     const match =
+      url.match(/-([0-9]+)\.html/) ??
       url.match(/\/([0-9]+)(?:\.html)?$/) ??
       url.match(/inzerat-([0-9]+)/i) ??
       url.match(/\/detail\/([0-9]+)/i);
@@ -369,7 +413,7 @@ export class TipCarsAdapter extends BaseAdapter {
 
   detectPromoted(raw: Record<string, unknown>): boolean {
     const text = JSON.stringify(raw).toLowerCase();
-    return text.includes('top nabídka') || text.includes('novinka');
+    return text.includes('top nabídka') || text.includes('topovan');
   }
 
   extractSellerSignals(raw: Record<string, unknown>) {

@@ -100,8 +100,43 @@ export const czMarket: MarketConfig = {
     /kup(uj|te) ted/i,
   ],
   stopwords: [],
-  accessoryHeadNouns: [],
-  forPrepositions: [],
+  // Czech spare-part / accessory head nouns beyond the built-in defaults
+  // (tokens are diacritic-stripped by the relevance tokenizer, so list both
+  // isn't needed — strip diacritics here). Covers car parts ("škoda octavia"
+  // must not surface bumpers and rims) and phone repair parts.
+  // Entries ending in "*" are stems (prefix match) covering Czech declensions:
+  // "svetl*" matches svetlo/svetla/svetel/svetlomet. Everything else matches
+  // exactly. Do NOT add stems that collide with city names or whole products
+  // ("prah*" would match "Praha", "motor*" would match "motorka").
+  accessoryHeadNouns: [
+    // ── car: body parts ──
+    'naraznik*', 'blatnik*', 'kapot*', 'dvere', 'dveri', 'zrcatk*', 'svetl*',
+    'mlhovk*', 'maska', 'masky', 'spojler*',
+    // ── car: wheels & tyres ──
+    'disk', 'disky', 'pneu*', 'gumy', 'kola', 'poklic*', 'rafky', 'elektrony', 'alu',
+    // ── car: mechanical ──
+    'motor', 'motoru', 'prevodovk*', 'spojka', 'spojky', 'brzd*', 'tlumic*',
+    'vyfuk*', 'chladic*', 'alternator*', 'starter*', 'naprav*', 'poloos*',
+    'rozvod*', 'turbo', 'turbodmychadl*', 'vstrik*', 'katalyzator*', 'filtr*',
+    'lozisk*', 'cerpadl*',
+    // ── car: interior / electrics ──
+    'sedack*', 'potah*', 'autokoberc*', 'koberc*', 'sterac*', 'autoradi*',
+    'autobateri*', 'ridici', 'jednotka', 'jednotky', 'tazne',
+    'spinac*', 'prepinac*', 'ramec*', 'popelnik*', 'ovladac*', 'ovladani',
+    'madlo', 'madla', 'delici', 'viko', 'vika', 'trubka', 'trubky',
+    'lista', 'listy', 'tapec*', 'budik*', 'snimac*', 'cidlo', 'cidla',
+    'palubk*', 'vzpery', 'tesneni', 'manzeta', 'manzety', 'kryty',
+    'lapac*', 'panel', 'panely', 'sitov*', 'stahovack*',
+    // ── merchandise / toy models (surface for car queries on Vinted) ──
+    'deagostini', 'welly', 'abrex', 'autko', 'autka', 'hodinky',
+    'kalendar', 'plakat*', 'samolepk*', 'hracka', 'hracky', 'stavebnice',
+    // ── phone/laptop repair parts ──
+    'displej*', 'lcd', 'digitizer*', 'flex', 'bateri*', 'zakladni',
+    'klavesnic*', 'touchpad*', 'panty',
+    // ── generic part-sale markers ──
+    'vrakovist*', 'dil', 'dily', 'dilu',
+  ],
+  forPrepositions: ['z', 'ze'],
   conditionSignals: { new: [], like_new: [], good: [], fair: [], poor: [] },
   relativeDateRules: [
     { pattern: /před (\d+) minut/i, unitMs: 60_000 },
