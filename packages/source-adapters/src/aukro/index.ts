@@ -34,6 +34,83 @@ import { BaseAdapter } from '../base-adapter.js';
 
 const BASE_URL = 'https://aukro.cz';
 
+/**
+ * Pull the raw item array out of an Aukro SEARCH-RESULTS page's ng-state.
+ * Exported standalone (parallel to extractDescriptionFromNgState above) so the
+ * 2026-08-24 regression -- Aukro switched the `searchItemsCommon` cache entry
+ * from a JSON-encoded string to a pre-parsed object on at least some responses,
+ * which made the un-guarded `JSON.parse(cacheVal)` throw and get silently
+ * swallowed, returning 0 items on every query -- has a regression test that
+ * does not depend on mocking fetch(). See aukro.test.ts.
+ */
+export function extractSearchItemsFromNgState(html: string): AukroItem[] {
+  // Angular embeds SSR transfer state in: <script id="ng-state" type="application/json">{...}</script>
+  const match = html.match(/id="ng-state"[^>]*>(\{[\s\S]*?\})<\/script>/);
+  if (!match) return [];
+
+  let state: Record<string, unknown>;
+  try {
+    state = JSON.parse(match[1]);
+  } catch {
+    return [];
+  }
+
+  const aukCache = (state['aukCache'] as Record<string, unknown>) ?? {};
+  for (const [cacheKey, cacheVal] of Object.entries(aukCache)) {
+    if (!cacheKey.includes('searchItemsCommon')) continue;
+    // Handle the cache value arriving as either a JSON string or an
+    // already-parsed object -- see the doc comment above.
+    let parsed: unknown = cacheVal;
+    if (typeof parsed === 'string') {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        continue;
+      }
+    }
+    return (parsed as { b?: { content?: AukroItem[] } })?.b?.content ?? [];
+  }
+  return [];
+}
+
+/**
+ * Pull the free-text description out of an Aukro item DETAIL page's ng-state.
+ * Exported standalone (rather than kept as a private method) so it can be unit
+ * tested against captured HTML without mocking fetch(). See aukro.test.ts.
+ */
+export function extractDescriptionFromNgState(html: string): string | null {
+  const match = html.match(/id="ng-state"[^>]*>(\{[\s\S]*?\})<\/script>/);
+  if (!match) return null;
+
+  let state: Record<string, unknown>;
+  try {
+    state = JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+
+  const aukCache = (state['aukCache'] as Record<string, unknown>) ?? {};
+  for (const [cacheKey, cacheVal] of Object.entries(aukCache)) {
+    if (!cacheKey.includes('offers') || !cacheKey.includes('offer')) continue;
+    // The offer-detail cache entry is a pre-parsed object on some responses
+    // and a JSON string on others; handle both rather than assuming.
+    let detail: unknown = cacheVal;
+    if (typeof detail === 'string') {
+      try {
+        detail = JSON.parse(detail);
+      } catch {
+        continue;
+      }
+    }
+    const b = (detail as { b?: Record<string, unknown> })?.b;
+    const stripped = b?.['descriptionStripped'];
+    if (typeof stripped === 'string' && stripped.trim().length > 0) {
+      return stripped.trim();
+    }
+  }
+  return null;
+}
+
 // ─── Raw types from the ng-state payload ─────────────────────────────────────
 
 interface AukroMoney {
@@ -101,7 +178,10 @@ export class AukroAdapter extends BaseAdapter {
   supportLevel = 'partial' as const;
 
   constructor(config: Partial<AdapterConfig> = {}) {
-    super({ timeout: 20_000, rateLimitMs: 2_000, ...config });
+    // retries: 1 keeps the worst case (20 s + 2 s pause + 20 s = 42 s) inside
+    // the coordinator's 55 s per-source deadline; with the default 2 retries
+    // (~66 s) a slow Aukro surfaced as "source timed out" instead of retrying.
+    super({ timeout: 20_000, rateLimitMs: 2_000, retries: 1, ...config });
   }
 
   buildSearchUrl(query: string, _filters?: SearchFilters): string {
@@ -139,6 +219,12 @@ export class AukroAdapter extends BaseAdapter {
 
     this.log(`Final URL: ${res.url} | Status: ${res.status}`);
 
+    // Aukro is behind Cloudflare. It lets ordinary requests through, but can
+    // challenge some networks (typically cloud/datacenter IPs). Name that case
+    // explicitly rather than reporting a bare 403.
+    if (res.headers.get('cf-mitigated') === 'challenge') {
+      throw new Error('Aukro blocks automated access from this network (Cloudflare bot challenge)');
+    }
     if (!res.ok) {
       throw new Error(`Aukro returned HTTP ${res.status}`);
     }
@@ -151,35 +237,7 @@ export class AukroAdapter extends BaseAdapter {
     html: string,
     filters?: SearchFilters,
   ): NormalizedListing[] {
-    // Angular embeds SSR transfer state in: <script id="ng-state" type="application/json">{...}</script>
-    const match = html.match(/id="ng-state"[^>]*>(\{[\s\S]*?\})<\/script>/);
-    if (!match) {
-      this.log('ng-state not found — page may not be SSR rendered');
-      return [];
-    }
-
-    let state: Record<string, unknown>;
-    try {
-      state = JSON.parse(match[1]);
-    } catch {
-      this.log('Failed to parse ng-state JSON');
-      return [];
-    }
-
-    const aukCache = (state['aukCache'] as Record<string, string>) ?? {};
-    let rawItems: AukroItem[] = [];
-
-    for (const [cacheKey, cacheVal] of Object.entries(aukCache)) {
-      if (!cacheKey.includes('searchItemsCommon')) continue;
-      try {
-        const parsed = JSON.parse(cacheVal) as { b?: { content?: AukroItem[] } };
-        rawItems = parsed?.b?.content ?? [];
-        break;
-      } catch {
-        // try next key
-      }
-    }
-
+    const rawItems = extractSearchItemsFromNgState(html);
     this.log(`ng-state: found ${rawItems.length} items`);
 
     // Apply price filters if provided
@@ -266,6 +324,50 @@ export class AukroAdapter extends BaseAdapter {
         pepperLevel: item.pepperLevel ?? 0,
       },
     };
+  }
+
+  // ─── Detail-page description fetch (research use only) ───────────────────────
+  //
+  // NOT part of the SourceAdapter interface and NOT called anywhere in the
+  // production search path (packages/platform/src/polish-search.ts and the live
+  // apps never invoke this). searchListings() always sets description: null
+  // because the search-results payload embedded in Aukro's ng-state does not
+  // carry item text -- only the item's own detail page does, at
+  // GET /backend-web/api/offers/{itemId}/offer inside that page's ng-state.
+  //
+  // Confirmed compliant against robots.txt on 2026-08-23: `/{seoUrl}-{itemId}`
+  // item pages are not in the Disallow list (only account/cart/promo paths are).
+  // See apps/research-harvester/SOURCES-COMPLIANCE.md.
+  //
+  // One HTTP request per listing -- callers are responsible for their own
+  // rate limiting across a batch, the same way searchListings leaves batching
+  // to the caller.
+
+  async fetchDescription(url: string): Promise<string | null> {
+    return this.withRetry(() => this._fetchDescription(url), 'aukro.detail');
+  }
+
+  private async _fetchDescription(url: string): Promise<string | null> {
+    this.log(`GET (detail) ${url}`);
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': this.config.userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'cs-CZ,cs;q=0.9,en;q=0.8',
+        'Cache-Control': 'no-cache',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(this.config.timeout),
+    });
+    if (!res.ok) {
+      throw new Error(`Aukro detail page returned HTTP ${res.status}`);
+    }
+    const html = await res.text();
+    return this.extractDescriptionFromNgState(html);
+  }
+
+  private extractDescriptionFromNgState(html: string): string | null {
+    return extractDescriptionFromNgState(html);
   }
 
   // ─── SourceAdapter interface stubs ───────────────────────────────────────────

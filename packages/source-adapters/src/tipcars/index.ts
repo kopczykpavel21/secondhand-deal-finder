@@ -189,6 +189,13 @@ export class TipCarsAdapter extends BaseAdapter {
         continue;
       }
 
+      // Since Oct 2026 every tipcars.com page sits behind a Cloudflare managed
+      // challenge ("Just a moment...", cf-mitigated: challenge) — the site is
+      // refusing automated clients. We do not try to get around it; report it
+      // plainly instead of a bare 403 so the status bar explains what happened.
+      if (response.headers.get('cf-mitigated') === 'challenge') {
+        throw new Error('TipCars blocks automated access (Cloudflare bot challenge)');
+      }
       if (!response.ok) {
         throw new Error(`TipCars HTTP ${response.status}`);
       }

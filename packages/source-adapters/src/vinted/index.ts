@@ -2,7 +2,7 @@
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  *  SOURCE REALITY REPORT — Vinted (vinted.cz)
  *  Strategy: plain fetch() → REST API  (NO Playwright needed)
- *  Verified live: April 2026
+ *  Verified live: April 2026; API host moved October 2026
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  *
  *  How it works:
@@ -11,14 +11,18 @@
  *       Set-Cookie: access_token_web=... header automatically —
  *       no login required.
  *    2. Reuse that token for all subsequent API calls (valid ~7 days).
- *    3. Call /api/v2/catalog/items?search_text=... with the Bearer token
- *       to get structured JSON — 96 items per page, two pages = up to 192.
+ *    3. Call https://api.vinted.{tld}/svc-catalogue/items?search_text=...
+ *       with the Bearer token to get structured JSON — 96 items per page,
+ *       two pages = up to 192.  (Until Oct 2026 this lived at
+ *       www.vinted.{tld}/api/v2/catalog/items, which now returns 404.)
+ *       The `Locale` header (e.g. cs-CZ) picks the language of the
+ *       condition labels; without it Vinted answers in French.
  *
  *  Extractable signals (from JSON, not DOM):
  *    ✅  Title, price (CZK), currency
- *    ✅  Condition (status field: "Nový s visačkou", "Dobrý", …)
+ *    ✅  Condition (item_box.second_line: "XL · Velmi dobrý", …)
  *    ✅  Thumbnail image URL
- *    ✅  Direct listing URL
+ *    ✅  Direct listing URL (relative path — prefixed with baseUrl)
  *    ✅  Item ID
  *    ✅  Promoted flag
  *    ✅  Favourite count (likes)
@@ -123,21 +127,23 @@ interface VintedUser {
   profile_url: string;
 }
 
+interface VintedItemBox {
+  first_line?: string;     // brand, e.g. "Nike"
+  second_line?: string;    // "{size} · {condition}", e.g. "XL · Velmi dobrý"
+}
+
 interface VintedItem {
   id: number;
   title: string;
   price: VintedPrice;
-  url: string;
-  path: string;
-  status: string;          // condition: "Nový s visačkou", "Dobrý", "Velmi dobrý", …
+  url: string;             // relative since Oct 2026: "/items/123-mikina"
   photo: VintedPhoto;
   photos: VintedPhoto[];
   favourite_count: number;
   view_count: number;
   promoted: boolean;
   user: VintedUser;
-  brand_title?: string;
-  size_title?: string;
+  item_box?: VintedItemBox;
 }
 
 interface VintedApiResponse {
@@ -147,6 +153,19 @@ interface VintedApiResponse {
   message?: string;
 }
 
+/** Split "XL · Velmi dobrý" into size and condition; the condition is always last. */
+function parseSecondLine(line: string | undefined): { sizeTitle: string | null; conditionText: string | null } {
+  const parts = (line ?? '').split(' · ').map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return { sizeTitle: null, conditionText: null };
+  const conditionText = parts[parts.length - 1];
+  const sizeTitle = parts.length > 1 ? parts.slice(0, -1).join(' · ') : null;
+  return { sizeTitle, conditionText };
+}
+
+function absoluteUrl(baseUrl: string, url: string): string {
+  return url.startsWith('http') ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 // ─── Adapter ──────────────────────────────────────────────────────────────────
 
 export class VintedAdapter extends BaseAdapter {
@@ -154,6 +173,7 @@ export class VintedAdapter extends BaseAdapter {
   supportLevel = 'full' as const; // clean API, very reliable
 
   private readonly baseUrl: string;
+  private readonly apiBaseUrl: string;
 
   constructor(
     config: Partial<AdapterConfig & { baseUrl?: string; marketConfig?: MarketConfig }> = {},
@@ -168,6 +188,8 @@ export class VintedAdapter extends BaseAdapter {
           : getMarketConfig('cz'));
     super({ timeout: 15_000, rateLimitMs: 1_000, ...adapterConfig }, inferredMarket);
     this.baseUrl = baseUrl ?? DEFAULT_BASE_URL;
+    // www.vinted.cz → api.vinted.cz (same rule Vinted's own web client uses)
+    this.apiBaseUrl = this.baseUrl.replace('://www.', '://api.');
   }
 
   buildSearchUrl(query: string, filters?: SearchFilters, page = 1): string {
@@ -178,7 +200,7 @@ export class VintedAdapter extends BaseAdapter {
     });
     if (filters?.priceMin != null) params.set('price_from', String(filters.priceMin));
     if (filters?.priceMax != null) params.set('price_to', String(filters.priceMax));
-    return `${this.baseUrl}/api/v2/catalog/items?${params.toString()}`;
+    return `${this.apiBaseUrl}/svc-catalogue/items?${params.toString()}`;
   }
 
   async searchListings(
@@ -212,7 +234,9 @@ export class VintedAdapter extends BaseAdapter {
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'application/json',
           'Accept-Language': this.marketConfig.locale,
-          'Referer': this.baseUrl,
+          'Locale': this.marketConfig.locale,
+          'Origin': this.baseUrl,
+          'Referer': `${this.baseUrl}/`,
         },
         signal: AbortSignal.timeout(this.config.timeout),
       });
@@ -236,14 +260,14 @@ export class VintedAdapter extends BaseAdapter {
         seenIds.add(id);
 
         const price = parseFloat(item.price?.amount ?? '0') || null;
-        const conditionText = item.status ?? null;
+        const { sizeTitle, conditionText } = parseSecondLine(item.item_box?.second_line);
         const imageUrl = this.bestPhoto(item);
 
         results.push({
           id: this.makeId(id),
           source: 'vinted',
           sourceListingId: id,
-          url: item.url ?? `${this.baseUrl}${item.path}`,
+          url: absoluteUrl(this.baseUrl, item.url),
           title: item.title,
           description: null,
           price,
@@ -261,7 +285,7 @@ export class VintedAdapter extends BaseAdapter {
           likes: item.favourite_count ?? null,
           shippingAvailable: true, // Vinted always ships
           promoted: item.promoted ?? false,
-          rawMetadata: { brandTitle: item.brand_title, sizeTitle: item.size_title },
+          rawMetadata: { brandTitle: item.item_box?.first_line ?? null, sizeTitle },
         });
       }
 

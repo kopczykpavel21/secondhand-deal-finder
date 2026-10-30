@@ -37,7 +37,10 @@ export function buildCzechAdapters(options: {
     }),
   ];
 
-  if (process.env.ENABLE_TIPCARS !== 'false') adapters.unshift(new TipCarsAdapter());
+  // Opt-in: tipcars.com answers every request with a Cloudflare bot challenge
+  // (Oct 2026), so it would only ever show as an error. Set ENABLE_TIPCARS=true
+  // to try it again if that changes.
+  if (process.env.ENABLE_TIPCARS === 'true') adapters.unshift(new TipCarsAdapter());
 
   if (process.env.ENABLE_SBAZAR !== 'false') adapters.push(new SbazarAdapter());
   if (process.env.ENABLE_AUKRO !== 'false') adapters.push(new AukroAdapter());
