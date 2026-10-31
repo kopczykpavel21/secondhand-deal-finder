@@ -8,6 +8,7 @@ import type {
 import { czMarket } from '@sdf/types';
 import { DEFAULT_WEIGHTS } from './weights.js';
 import { scoreRelevance } from './components/relevance.js';
+import { analyzeQuery, createListingKindFilter } from './components/listing-kind.js';
 import { scoreValueForMoney } from './components/value-for-money.js';
 import { scoreCondition } from './components/condition.js';
 import { scoreFreshness } from './components/freshness.js';
@@ -139,6 +140,9 @@ function getEffectiveWeights(
 
 // ─── Main scorer ─────────────────────────────────────────────────────────────
 
+/** Same cap scoreRelevance applies to "Kryt pro iPhone 13" — below RELEVANCE_GATE. */
+const HIDDEN_KIND_RELEVANCE = 0.05;
+
 export function scoreListings(
   listings: NormalizedListing[],
   query: string,
@@ -147,9 +151,20 @@ export function scoreListings(
 ): ScoredListing[] {
   // Pre-compute relevance so we can filter out accessories before calculating
   // the price median — cheap cases/chargers would otherwise drag the median down
-  // and make actual phones look overpriced.
+  // and make actual phones look overpriced. Listings that are not the searched
+  // product at all (parts, toy models, games, "na ND" — see listing-kind.ts)
+  // get the same capped score as a title-matched accessory, so the relevance
+  // gate below drops them.
+  const kindOf = createListingKindFilter(query, listings, marketConfig);
+  const queryWantsAccessories = analyzeQuery(query, marketConfig).wants.has('accessory');
+  // A listing priced like the product is a bundle ("Garmin Venu 4 + řemínek"),
+  // so the title-based accessory guard does not apply to it either.
   const relevanceScores = listings.map((l) =>
-    scoreRelevance(query, l.title, l.description, marketConfig),
+    kindOf(l)
+      ? HIDDEN_KIND_RELEVANCE
+      : scoreRelevance(query, l.title, l.description, marketConfig, {
+          queryWantsAccessories: queryWantsAccessories || kindOf.pricedLikeProduct(l),
+        }),
   );
 
   const relevantPrices = listings

@@ -15,15 +15,26 @@
  */
 
 // ─── Diacritics ───────────────────────────────────────────────────────────────
+//
+// Unicode decomposition covers every accented Latin letter — Czech, Slovak,
+// Polish, German, Hungarian, Romanian — plus Greek tonos. Vinted shows
+// cross-border listings, so a Czech search routinely meets Polish titles.
+// The few letters NFD leaves whole ("ł", "ß", …) are mapped by hand.
 
-const DIACRITIC_MAP: Record<string, string> = {
-  á: 'a', č: 'c', ď: 'd', é: 'e', ě: 'e', í: 'i',
-  ň: 'n', ó: 'o', ř: 'r', š: 's', ť: 't', ú: 'u',
-  ů: 'u', ý: 'y', ž: 'z',
+const UNDECOMPOSED: Record<string, string> = {
+  ł: 'l', đ: 'd', ß: 'ss', ø: 'o', æ: 'ae', œ: 'oe', ı: 'i', ħ: 'h',
 };
 
-function stripDiacritics(s: string): string {
-  return s.replace(/[áčďéěíňóřšťúůýž]/g, (c) => DIACRITIC_MAP[c] ?? c);
+export function stripDiacritics(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[łđßøæœıħ]/g, (c) => UNDECOMPOSED[c] ?? c);
+}
+
+/** Lowercase + strip diacritics, keeping a trailing "*" stem marker. */
+export function normalizeNoun(noun: string): string {
+  return stripDiacritics(noun.toLowerCase());
 }
 
 // ─── Query / title normalisation ─────────────────────────────────────────────
@@ -56,7 +67,7 @@ function normalizeInput(s: string): string {
 //      Query tokens dominate the title's opening section, an accessory noun
 //      appears after the last product-token match.
 
-const DEFAULT_ACCESSORY_HEAD_NOUNS = [
+export const DEFAULT_ACCESSORY_HEAD_NOUNS = [
   // ── Czech: cases & covers ────────────────────────────────────────────────
   'kryt', 'krytu', 'kryty', 'krytem',
   'pouzdro', 'pouzdra', 'pouzdru', 'pouzdrem',
@@ -121,7 +132,7 @@ const DEFAULT_ACCESSORY_HEAD_NOUNS = [
   'sleeve',
   'pouch',
   'strap', 'straps',
-  'band', 'bands',
+  // not "band": watch model names end in it ("Epix Pro 47mm Black Band")
   'mount',
   'grip',
   'bracelet',
@@ -133,7 +144,7 @@ const DEFAULT_ACCESSORY_HEAD_NOUNS = [
   'accessory', 'accessories',
 ];
 
-const DEFAULT_FOR_PREPOSITIONS = [
+export const DEFAULT_FOR_PREPOSITIONS = [
   'pro', 'na', 'for', 'k', 'do', 'kompatibilni', 'compatible',
 ];
 
@@ -142,12 +153,15 @@ const DEFAULT_FOR_PREPOSITIONS = [
 // product-then-accessory pattern (d) is skipped, so a car advertised with
 // bonus wheels ("… 2x kola, zimní pneu") is not misclassified as a part.
 // Noun-led patterns (b)/(c) ("Alu kola pro Octavii") still apply.
-const WHOLE_ITEM_SPEC_TOKENS = new Set([
+export const WHOLE_ITEM_SPEC_TOKENS = new Set([
   // cars — engine/drivetrain specs
   'tdi', 'tsi', 'mpi', 'dsg', 'kw', 'hdi', 'dci', 'cdti', 'crdi', 'tgi',
   'tfsi', 'vtec', 'cvt', 'xdrive', 'quattro', '4x4', '4matic', 'awd',
   // electronics — storage size ("128 GB") marks a whole device, not a part
   'gb', 'tb',
+  // watches — "Chytré hodinky Garmin Fenix 6 + náhradní řemínek" is the watch;
+  // strap listings lead with the noun ("Řemínek pro hodinky Garmin")
+  'hodinky', 'gps', 'sapphire', 'solar', 'amoled', 'titanium',
 ]);
 
 /**
@@ -156,7 +170,7 @@ const WHOLE_ITEM_SPEC_TOKENS = new Set([
  * svetlomet. All other entries match exactly, so "motor" cannot swallow
  * "motorka" and "band" cannot swallow "bandage".
  */
-function isAccessoryNounToken(token: string, nouns: Set<string>): boolean {
+export function isAccessoryNounToken(token: string, nouns: Set<string>): boolean {
   if (nouns.has(token)) return true;
   for (const noun of nouns) {
     if (noun.endsWith('*') && token.startsWith(noun.slice(0, -1))) return true;
@@ -172,16 +186,22 @@ function isAccessoryNounToken(token: string, nouns: Set<string>): boolean {
  *  (c) Direct follow — "Remínek Apple Watch 44mm"
  *  (d) Product then accessory — "iPhone 13 kryt", "Apple Watch remínek"
  */
-function isAccessoryForQuery(
+export function isAccessoryForQuery(
   titleTokens: string[],
   queryTokens: string[],
   accessoryHeadNouns: Set<string>,
   forPrepositions: Set<string>,
+  /** leadOnly: only the noun-led patterns (b)/(c) — for nouns that also
+   *  appear in bundle titles ("PS5 + 2 ovladače", "iPhone 13, nový displej").
+   *  leadWindow: how many leading tokens may hold the noun (default 2). */
+  opts: { leadOnly?: boolean; leadWindow?: number } = {},
 ): boolean {
   if (titleTokens.length < 2 || queryTokens.length === 0) return false;
 
   // (a) Title must start with an accessory noun (first 2 tokens)
-  const accessoryLeadIdx = titleTokens.slice(0, 2).findIndex((t) => isAccessoryNounToken(t, accessoryHeadNouns));
+  const accessoryLeadIdx = titleTokens
+    .slice(0, opts.leadWindow ?? 2)
+    .findIndex((t) => isAccessoryNounToken(t, accessoryHeadNouns));
 
   if (accessoryLeadIdx !== -1) {
     const afterLead = titleTokens.slice(accessoryLeadIdx + 1);
@@ -212,6 +232,7 @@ function isAccessoryForQuery(
   // "2.0 TDI 110kW … + zimní kola" or a phone as "128 GB … + kryt" is the
   // product itself, not a part (noun-LED titles above cap regardless —
   // "Motor 1.9 TDI z Škoda Octavia" is still a part).
+  if (opts.leadOnly) return false;
   if (titleTokens.some((t) => WHOLE_ITEM_SPEC_TOKENS.has(t))) return false;
 
   if (titleTokens.some((t) => isAccessoryNounToken(t, accessoryHeadNouns))) {
@@ -226,7 +247,7 @@ function isAccessoryForQuery(
 
 // ─── Stopwords ────────────────────────────────────────────────────────────────
 
-const DEFAULT_STOPWORDS = [
+export const DEFAULT_STOPWORDS = [
   // Czech
   'a', 'i', 'o', 'u', 'v', 'z', 'k', 's', 'na', 'za', 'do',
   'od', 'po', 've', 'ze', 'ke', 'se', 'si', 'je', 'to', 'ta',
@@ -243,14 +264,16 @@ function isNumeric(t: string): boolean {
   return /^\d+(\.\d+)?$/.test(t);
 }
 
-function tokenize(s: string): string[] {
+// \p{L} rather than \w: \w is ASCII-only, so it used to cut "ładowarka" into
+// "adowarka" and erase Greek titles entirely.
+export function tokenize(s: string): string[] {
   return stripDiacritics(normalizeInput(s).toLowerCase())
-    .replace(/[^\w\s]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)
     .filter(Boolean);
 }
 
-function filterQueryTokens(tokens: string[], stopwords: Set<string>): string[] {
+export function filterQueryTokens(tokens: string[], stopwords: Set<string>): string[] {
   const filtered = tokens.filter((t) => t.length > 2 && !stopwords.has(t));
   return filtered.length > 0 ? filtered : tokens;
 }
@@ -282,7 +305,7 @@ function levenshtein(a: string, b: string): number {
  * token "octavia" ('octavia'.includes('a')) and every Czech conjunction
  * would count as a query hit. Falls back to Levenshtein ≤ 1 for longer tokens.
  */
-function tokenMatches(dt: string, qt: string): boolean {
+export function tokenMatches(dt: string, qt: string): boolean {
   if (isNumeric(qt)) return dt === qt;
   if (dt === qt) return true;
   if (qt.length >= 3 && dt.includes(qt)) return true;
@@ -316,6 +339,9 @@ export function scoreRelevance(
   title: string,
   description: string | null,
   marketConfig?: Pick<MarketConfig, 'stopwords' | 'accessoryHeadNouns' | 'forPrepositions'>,
+  /** The query asks for parts/accessories in words this file's list does not
+   *  know ("alu kola", "dualsense") — see listing-kind.ts analyzeQuery. */
+  opts: { queryWantsAccessories?: boolean } = {},
 ): number {
   const rawQueryTokens = tokenize(query);
   if (rawQueryTokens.length === 0) return 0.5;
@@ -323,21 +349,22 @@ export function scoreRelevance(
   const stopwords = new Set([
     ...DEFAULT_STOPWORDS,
     ...(marketConfig?.stopwords ?? []),
-  ]);
+  ].map(normalizeNoun));
   const accessoryHeadNouns = new Set([
     ...DEFAULT_ACCESSORY_HEAD_NOUNS,
     ...(marketConfig?.accessoryHeadNouns ?? []),
-  ]);
+  ].map(normalizeNoun));
   const forPrepositions = new Set([
     ...DEFAULT_FOR_PREPOSITIONS,
     ...(marketConfig?.forPrepositions ?? []),
-  ]);
+  ].map(normalizeNoun));
 
   const queryTokens = filterQueryTokens(rawQueryTokens, stopwords);
   const titleTokens = tokenize(title);
 
   // ── Accessory guard ───────────────────────────────────────────────────────
-  const queryMentionsAccessory = queryTokens.some((t) => isAccessoryNounToken(t, accessoryHeadNouns));
+  const queryMentionsAccessory =
+    opts.queryWantsAccessories || queryTokens.some((t) => isAccessoryNounToken(t, accessoryHeadNouns));
   if (!queryMentionsAccessory && isAccessoryForQuery(titleTokens, queryTokens, accessoryHeadNouns, forPrepositions)) {
     return 0.05;
   }

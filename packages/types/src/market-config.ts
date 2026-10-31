@@ -112,8 +112,9 @@ export const czMarket: MarketConfig = {
     // ── car: body parts ──
     'naraznik*', 'blatnik*', 'kapot*', 'dvere', 'dveri', 'zrcatk*', 'svetl*',
     'mlhovk*', 'maska', 'masky', 'spojler*',
-    // ── car: wheels & tyres ──
-    'disk', 'disky', 'pneu*', 'gumy', 'kola', 'poklic*', 'rafky', 'elektrony', 'alu',
+    // ── car: wheels & tyres ── ("kola", "disk", "gumy", "alu" moved to the
+    // car-search list in scoring/listing-kind.ts: here they hid bikes, SSDs)
+    'pneu*', 'poklic*', 'rafky', 'elektrony',
     // ── car: mechanical ──
     'motor', 'motoru', 'prevodovk*', 'spojka', 'spojky', 'brzd*', 'tlumic*',
     'vyfuk*', 'chladic*', 'alternator*', 'starter*', 'naprav*', 'poloos*',
@@ -122,17 +123,15 @@ export const czMarket: MarketConfig = {
     // ── car: interior / electrics ──
     'sedack*', 'potah*', 'autokoberc*', 'koberc*', 'sterac*', 'autoradi*',
     'autobateri*', 'ridici', 'jednotka', 'jednotky', 'tazne',
-    'spinac*', 'prepinac*', 'ramec*', 'popelnik*', 'ovladac*', 'ovladani',
+    'spinac*', 'prepinac*', 'ramec*', 'popelnik*', // ovladač → listing-kind.ts ("PS5 + 2 ovladače" is a bundle)
     'madlo', 'madla', 'delici', 'viko', 'vika', 'trubka', 'trubky',
     'lista', 'listy', 'tapec*', 'budik*', 'snimac*', 'cidlo', 'cidla',
     'palubk*', 'vzpery', 'tesneni', 'manzeta', 'manzety', 'kryty',
     'lapac*', 'panel', 'panely', 'sitov*', 'stahovack*',
-    // ── merchandise / toy models (surface for car queries on Vinted) ──
-    'deagostini', 'welly', 'abrex', 'autko', 'autka', 'hodinky',
-    'kalendar', 'plakat*', 'samolepk*', 'hracka', 'hracky', 'stavebnice',
-    // ── phone/laptop repair parts ──
-    'displej*', 'lcd', 'digitizer*', 'flex', 'bateri*', 'zakladni',
-    'klavesnic*', 'touchpad*', 'panty',
+    // Toy/merch words ("hodinky", "stavebnice", "autka"…) and phone/laptop
+    // repair parts ("lcd", "displej", "baterie"…) live in
+    // scoring/listing-kind.ts and apply only to car/device searches — as
+    // generic nouns they hid real watches, LEGO sets and LCD monitors.
     // ── generic part-sale markers ──
     'vrakovist*', 'dil', 'dily', 'dilu',
   ],

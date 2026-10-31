@@ -46,6 +46,15 @@ export interface NormalizedListing {
   shippingAvailable: boolean | null;
   /** True when the adapter detects paid promotion signals */
   promoted: boolean;
+  /**
+   * The marketplace's own category for the listing, as human-readable text —
+   * a path joined with " > " where the source exposes one (Aukro:
+   * "Modelářství > Modely automobilů > …"), a single name otherwise (Sbazar:
+   * "Náhradní díly a příslušenství"), or the site section (Bazoš: "auto").
+   * Undefined/null when the source does not expose it (Vinted, Fler).
+   * Used by the listing-kind filter to hide parts, toys and accessories.
+   */
+  category?: string | null;
   rawMetadata: Record<string, unknown>;
 }
 

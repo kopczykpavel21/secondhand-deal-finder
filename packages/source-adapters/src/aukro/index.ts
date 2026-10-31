@@ -155,6 +155,7 @@ interface AukroItem {
   ppPriorityList?: unknown;
   seller?: AukroSeller;
   attributes?: AukroAttribute[];
+  categoryPath?: Array<{ id: number; name: string; seoUrl: string }>;
 }
 
 // ─── Condition mapping ────────────────────────────────────────────────────────
@@ -318,6 +319,11 @@ export class AukroAdapter extends BaseAdapter {
       likes: item.watchersCount ?? null,
       shippingAvailable: item.freeShipping ?? null,
       promoted,
+      // Root first: "Počítače a hry > Herní zařízení > … > PlayStation 5".
+      // The root node is a catch-all ("Počítače a hry") and is dropped.
+      category: item.categoryPath?.length
+        ? item.categoryPath.slice(1).map((c) => c.name).join(' > ') || item.categoryPath[0].name
+        : null,
       rawMetadata: {
         auction: item.auction ?? false,
         buyNowActive: item.buyNowActive ?? false,

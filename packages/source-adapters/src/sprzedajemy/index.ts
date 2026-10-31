@@ -98,6 +98,28 @@ function collectStructuredObjects(html: string): Record<string, unknown>[] {
   return out;
 }
 
+/**
+ * Map listing id → marketplace category. Each result is one <article> holding
+ * the listing link (…-nr73812335) and a category link whose path is
+ * /{city}/{category}/{subcategory}/… plus the leaf's display name:
+ *   "elektronika > telefony i akcesoria > akcesoria gsm > Pokrowce, futerały i kabury"
+ */
+function extractCategoriesById(html: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const block of html.split('<article').slice(1)) {
+    const id = block.match(/-nr(\d+)/)?.[1];
+    const cat = block.match(
+      /class="location-and-category" href="https:\/\/sprzedajemy\.pl\/[^/"]+\/([^"]+)"[\s\S]*?location-and-category__category">([^<]*)</,
+    );
+    if (!id || !cat || out.has(id)) continue;
+    const path = cat[1].split('/').map((seg) => seg.replace(/-/g, ' '));
+    const leaf = decodeEntities(cat[2]).trim();
+    if (leaf) path[path.length - 1] = leaf;
+    out.set(id, path.join(' > '));
+  }
+  return out;
+}
+
 export class SprzedajemyAdapter extends BaseAdapter {
   source = 'sprzedajemy' as const;
   supportLevel = 'full' as const;
@@ -148,6 +170,7 @@ export class SprzedajemyAdapter extends BaseAdapter {
   private parseStructured(html: string): NormalizedListing[] {
     const results: NormalizedListing[] = [];
     const seen = new Set<string>();
+    const categories = extractCategoriesById(html);
 
     for (const obj of collectStructuredObjects(html)) {
       const rawUrl = asString(obj.url) ?? asString(obj.href) ?? asString(obj.link);
@@ -203,6 +226,7 @@ export class SprzedajemyAdapter extends BaseAdapter {
         likes: null,
         shippingAvailable: /wysył|wysyl|kurier|paczkomat|odbiór|odbior/i.test(shippingText),
         promoted: this.detectPromoted(obj),
+        category: categories.get(listingId) ?? null,
         rawMetadata: obj,
       });
     }
@@ -216,6 +240,7 @@ export class SprzedajemyAdapter extends BaseAdapter {
     ];
     const results: NormalizedListing[] = [];
     const seen = new Set<string>();
+    const categories = extractCategoriesById(html);
 
     for (const match of hrefMatches) {
       const href = match[1];
@@ -265,6 +290,7 @@ export class SprzedajemyAdapter extends BaseAdapter {
         likes: null,
         shippingAvailable: /wysył|wysyl|kurier|paczkomat|odbiór|odbior/i.test(plain),
         promoted: /polecan|promowan|pilne/i.test(plain),
+        category: categories.get(listingId) ?? null,
         rawMetadata: { excerpt: plain.slice(0, 500) },
       });
     }

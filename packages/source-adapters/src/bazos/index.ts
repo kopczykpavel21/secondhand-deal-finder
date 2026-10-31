@@ -226,6 +226,9 @@ export class BazosAdapter extends BaseAdapter {
           likes: null,
           shippingAvailable: null,
           promoted: isPromoted,
+          // Search results only expose the site section, via the subdomain:
+          // https://auto.bazos.cz/inzerat/… → "auto", sluzby → services.
+          category: href.match(/^https?:\/\/([a-z]+)\.bazos\.cz\//)?.[1] ?? null,
           rawMetadata: { priceText, location, dateText, viewsText },
         });
       }

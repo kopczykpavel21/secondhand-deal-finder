@@ -1,6 +1,15 @@
 export { scoreListings } from './scorer.js';
 export { DEFAULT_WEIGHTS } from './weights.js';
 export { scoreRelevance } from './components/relevance.js';
+export {
+  analyzeQuery,
+  categoryKind,
+  createListingKindFilter,
+  type ListingKind,
+  type ListingKindFilter,
+  type QueryFamily,
+  type QueryIntent,
+} from './components/listing-kind.js';
 export { scoreValueForMoney } from './components/value-for-money.js';
 export { scoreCondition, normalizeCondition, conditionLabel } from './components/condition.js';
 export { scoreFreshness } from './components/freshness.js';

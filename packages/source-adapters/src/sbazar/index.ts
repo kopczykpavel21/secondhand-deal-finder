@@ -390,6 +390,8 @@ export class SbazarAdapter extends BaseAdapter {
       likes: null,
       shippingAvailable: null,
       promoted: !!(raw.top ?? raw.promoted ?? raw.isTop ?? raw.boosted),
+      // items/search returns the leaf category: {"id":7,"name":"Náhradní díly a příslušenství"}
+      category: ((raw.category as Record<string, unknown> | undefined)?.name as string | undefined) ?? null,
       rawMetadata: raw,
     };
   }
