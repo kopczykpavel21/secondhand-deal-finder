@@ -24,12 +24,12 @@ function getFactors(sortBy: SortOption): Factor[] {
       { label: 'Důvěryhodnost prodávajícího', pct: 5 },
       { label: 'Kompletnost inzerátu', pct: 5 },
       { label: 'Zájem kupujících', pct: 4 },
-      { label: 'Poměr ceny k ostatním', pct: 0, ignored: true },
+      { label: 'Cena proti srovnatelným nabídkám', pct: 0, ignored: true },
     ];
   }
   return [
     { label: 'Shoda s hledaným výrazem', pct: 37 },
-    { label: 'Poměr ceny k ostatním', pct: 19 },
+    { label: 'Cena proti srovnatelným nabídkám', pct: 19 },
     { label: 'Stav zboží', pct: 11 },
     { label: 'Zájem kupujících', pct: 11 },
     { label: 'Čerstvost inzerátu', pct: 7 },
@@ -125,7 +125,10 @@ export function MethodologyPanel({ sortBy }: MethodologyPanelProps) {
           ))}
         </div>
         <p className="mt-4 text-xs text-slate-400 leading-relaxed">
-          Penalizace: spam nebo podezřele nízká cena −40 % · topovaný inzerát se hodnotí na základě obsahu (bez penalizace za topování).
+          Cena se porovnává s mediánem nabídek stejného modelu, varianty a paměti (kde je jich dost), jinak s celým hledáním.
+          Cena hluboko pod srovnatelnými nabídkami se neodměňuje — inzerát zůstává vidět s označením „podezřele levné“.
+          Jiné modely téže řady, příslušenství a díly se nezobrazují.
+          Penalizace: spam nebo nereálně nízká cena −40 % · topovaný inzerát se hodnotí na základě obsahu (bez penalizace za topování).
         </p>
       </div>
     </div>

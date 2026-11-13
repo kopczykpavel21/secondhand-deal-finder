@@ -1,6 +1,7 @@
 import type {
   MarketConfig,
   NormalizedListing,
+  PriceCheck,
   ScoredListing,
   ScoringWeights,
   ScoreComponents,
@@ -9,7 +10,7 @@ import { czMarket } from '@sdf/types';
 import { DEFAULT_WEIGHTS } from './weights.js';
 import { scoreRelevance } from './components/relevance.js';
 import { analyzeQuery, createListingKindFilter } from './components/listing-kind.js';
-import { scoreValueForMoney } from './components/value-for-money.js';
+import { buildPriceReference } from './components/value-for-money.js';
 import { scoreCondition } from './components/condition.js';
 import { scoreFreshness } from './components/freshness.js';
 import { scoreCompleteness } from './components/completeness.js';
@@ -44,6 +45,7 @@ function buildExplanation(
   listing: NormalizedListing,
   weights: ScoringWeights,
   market: Pick<MarketConfig, 'id' | 'minPlausiblePrice'>,
+  priceCheck?: PriceCheck,
 ): string[] {
   const lines: string[] = [];
   const isPolish = market.id === 'pl';
@@ -53,14 +55,34 @@ function buildExplanation(
   else if (components.relevance < 0.4)
     lines.push(isPolish ? 'Częściowa zgodność — brakuje części słów kluczowych.' : 'Částečná shoda — některá klíčová slova chybí.');
 
-  if (weights.valueForMoney === 0) {
+  // Warnings about the price itself hold whatever the sort is
+  if (priceCheck?.flag === 'placeholder') {
+    lines.push(isPolish
+      ? 'Cena wygląda na wpisaną dla formalności — prawdziwej szukaj w opisie.'
+      : 'Cena vypadá jako zástupná — skutečnou hledejte v textu inzerátu.');
+  } else if (priceCheck?.flag === 'suspiciously_low') {
+    const pct = Math.round(priceCheck.ratio * 100);
+    lines.push(isPolish
+      ? `Uwaga: cena to tylko ${pct} % mediany ${priceCheck.sampleSize} porównywalnych ofert — sprawdź stan i sprzedającego.`
+      : `Pozor: cena je jen ${pct} % mediánu ${priceCheck.sampleSize} srovnatelných nabídek — ověřte stav a prodejce.`);
+  } else if (weights.valueForMoney === 0) {
     lines.push(isPolish ? 'Cena nie była uwzględniona w ocenie.' : 'Cena nebyla při hodnocení zohledněna.');
-  } else if (components.valueForMoney >= 0.7) {
-    lines.push(isPolish ? 'Cena jest poniżej mediany dla tego wyszukiwania — wygląda na okazję.' : 'Cena je pod mediánem pro toto hledání — výhodná koupě.');
-  } else if (components.valueForMoney <= 0.35) {
-    lines.push(isPolish ? 'Cena jest powyżej mediany podobnych ofert.' : 'Cena je nad mediánem podobných inzerátů.');
-  } else {
-    lines.push(isPolish ? 'Cena jest zbliżona do średniej podobnych ofert.' : 'Cena odpovídá průměru podobných nabídek.');
+  } else if (priceCheck) {
+    const diff = Math.round((priceCheck.ratio - 1) * 100);
+    const group = comparisonGroupLabel(priceCheck, isPolish);
+    if (diff <= -8) {
+      lines.push(isPolish
+        ? `Cena jest o ${-diff} % niższa niż mediana ${group}.`
+        : `Cena je o ${-diff} % pod mediánem ${group}.`);
+    } else if (diff >= 8) {
+      lines.push(isPolish
+        ? `Cena jest o ${diff} % wyższa niż mediana ${group}.`
+        : `Cena je o ${diff} % nad mediánem ${group}.`);
+    } else {
+      lines.push(isPolish
+        ? `Cena odpowiada medianie ${group}.`
+        : `Cena odpovídá mediánu ${group}.`);
+    }
   }
 
   if (components.condition >= 0.8)
@@ -96,6 +118,25 @@ function buildExplanation(
     lines.push(isPolish ? 'Dostępna wysyłka.' : 'Možnost doručení.');
 
   return lines;
+}
+
+/** "34 nabídek stejného modelu a paměti" — what the price was compared with. */
+function comparisonGroupLabel(check: PriceCheck, isPolish: boolean): string {
+  const n = check.sampleSize;
+  if (isPolish) {
+    switch (check.basis) {
+      case 'same_spec': return `${n} ofert tego samego modelu i pamięci`;
+      case 'same_model': return `${n} ofert tego samego modelu`;
+      case 'model_family': return `${n} ofert z tej samej serii`;
+      default: return `${n} podobnych ofert w tym wyszukiwaniu`;
+    }
+  }
+  switch (check.basis) {
+    case 'same_spec': return `${n} nabídek stejného modelu a paměti`;
+    case 'same_model': return `${n} nabídek stejného modelu`;
+    case 'model_family': return `${n} nabídek stejné modelové řady`;
+    default: return `${n} podobných nabídek v tomto hledání`;
+  }
 }
 
 // ─── Source-aware weight redistribution ──────────────────────────────────────
@@ -143,6 +184,24 @@ function getEffectiveWeights(
 /** Same cap scoreRelevance applies to "Kryt pro iPhone 13" — below RELEVANCE_GATE. */
 const HIDDEN_KIND_RELEVANCE = 0.05;
 
+/**
+ * "iphone 13" also finds the 13 mini, Pro and Pro Max. They stay in the
+ * results but rank after the model that was asked for.
+ */
+const OTHER_VARIANT_FACTOR = 0.92;
+
+/**
+ * The query pins a model and only the description — not the title — supplies
+ * the match: "Galaxy S26 Ultra … Výměna za iPhone" whose text mentions an
+ * iPhone 13, a MacBook ad that lists the seller's other devices. Such a
+ * listing may still be the product ("Prodám iPhone" + "iPhone 13, 128 GB" in
+ * the text), so it stays, behind the listings whose title names the model.
+ */
+const DESCRIPTION_ONLY_MODEL_FACTOR = 0.85;
+
+/** What the buyer pays — the listed price plus any mandatory marketplace fee. */
+const priceToPay = (l: NormalizedListing): number | null => l.totalPrice ?? l.price;
+
 export function scoreListings(
   listings: NormalizedListing[],
   query: string,
@@ -159,36 +218,53 @@ export function scoreListings(
   const queryWantsAccessories = analyzeQuery(query, marketConfig).wants.has('accessory');
   // A listing priced like the product is a bundle ("Garmin Venu 4 + řemínek"),
   // so the title-based accessory guard does not apply to it either.
-  const relevanceScores = listings.map((l) =>
-    kindOf(l)
-      ? HIDDEN_KIND_RELEVANCE
-      : scoreRelevance(query, l.title, l.description, marketConfig, {
-          queryWantsAccessories: queryWantsAccessories || kindOf.pricedLikeProduct(l),
-        }),
+  const matcher = kindOf.matcher;
+  const signatures = listings.map((l) => matcher.signature(l.title));
+  const relevanceScores = listings.map((l, i) => {
+    if (kindOf(l)) return HIDDEN_KIND_RELEVANCE;
+    const relevanceOpts = {
+      queryWantsAccessories: queryWantsAccessories || kindOf.pricedLikeProduct(l),
+    };
+    const relevance = scoreRelevance(query, l.title, l.description, marketConfig, relevanceOpts);
+    if (!matcher.pinned) return relevance;
+
+    if (signatures[i].model === 'match') {
+      const otherVariant = signatures[i].variants.some((v) => !matcher.queryVariants.includes(v));
+      return otherVariant ? relevance * OTHER_VARIANT_FACTOR : relevance;
+    }
+    // Title does not name the model: did the description carry the match?
+    if (!l.description) return relevance;
+    const titleOnly = scoreRelevance(query, l.title, null, marketConfig, relevanceOpts);
+    return titleOnly < relevance
+      ? Math.max(titleOnly, relevance * DESCRIPTION_ONLY_MODEL_FACTOR)
+      : relevance;
+  });
+
+  // Reference prices come from relevant listings only — cheap cases and
+  // chargers would otherwise drag the median down — and are kept per model,
+  // variant and storage (see value-for-money.ts).
+  const priceReference = buildPriceReference(
+    listings.map((l, i) => ({
+      price: priceToPay(l),
+      signature: signatures[i],
+      comparable: relevanceScores[i] > 0.3,
+    })),
   );
-
-  const relevantPrices = listings
-    .filter((l, i) => relevanceScores[i] > 0.3 && l.price !== null && l.price > 0)
-    .map((l) => l.price as number);
-
-  // Fall back to all prices if too few relevant listings found
-  const validPrices =
-    relevantPrices.length >= 3
-      ? relevantPrices
-      : listings.map((l) => l.price).filter((p): p is number => p !== null && p > 0);
 
   // Filter out listings with near-zero relevance — these are structurally
   // unrelated results (e.g. Fler returning fashion items for "Skoda Octavia").
   const RELEVANCE_GATE = 0.1;
   const filteredListings = listings.filter((_, i) => relevanceScores[i] >= RELEVANCE_GATE);
   const filteredRelevance = relevanceScores.filter((s) => s >= RELEVANCE_GATE);
+  const filteredSignatures = signatures.filter((_, i) => relevanceScores[i] >= RELEVANCE_GATE);
 
   return filteredListings.map((listing, idx) => {
     // Adjust weights for signals this source structurally cannot provide
     const w = getEffectiveWeights(listing, weights);
 
     const relevance = filteredRelevance[idx];
-    const valueForMoney = scoreValueForMoney(listing.price, validPrices);
+    const { score: valueForMoney, check: priceCheck } =
+      priceReference.assess(priceToPay(listing), filteredSignatures[idx]);
     const condition     = scoreCondition(listing.condition);
     // Topped (promoted) listings are re-topped daily so postedAt always shows
     // today — the real listing age is unknown. Use neutral 0.5 instead.
@@ -241,7 +317,8 @@ export function scoreListings(
       ...listing,
       score,
       scoreComponents: components,
-      scoreExplanation: buildExplanation(components, listing, weights, marketConfig),
+      scoreExplanation: buildExplanation(components, listing, weights, marketConfig, priceCheck),
+      ...(priceCheck ? { priceCheck } : {}),
     };
   });
 }
