@@ -235,6 +235,27 @@ export function ResultCard({ listing, rank, debugMode, onDismiss }: ResultCardPr
               <span className="font-bold text-slate-900 text-base sm:text-lg">
                 {formatPrice(listing.price, listing.currency)}
               </span>
+              {listing.totalPrice != null && listing.price != null && listing.totalPrice > listing.price && (
+                <span className="text-xs text-slate-500" title="Cena včetně povinného poplatku za ochranu kupujícího, bez poštovného">
+                  s poplatkem {formatPrice(listing.totalPrice, listing.currency)}
+                </span>
+              )}
+              {listing.priceCheck?.flag === 'suspiciously_low' && (
+                <span
+                  title={`Jen ${Math.round(listing.priceCheck.ratio * 100)} % mediánu ${listing.priceCheck.sampleSize} srovnatelných nabídek (${formatPrice(listing.priceCheck.referencePrice, listing.currency)}). Ověřte stav a prodejce.`}
+                  className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700"
+                >
+                  podezřele levné
+                </span>
+              )}
+              {listing.priceCheck?.flag === 'placeholder' && (
+                <span
+                  title="Cena vypadá jako zástupná — skutečnou hledejte v textu inzerátu."
+                  className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600"
+                >
+                  cena v textu?
+                </span>
+              )}
               {listing.priceChange && (
                 <span
                   title={`Dříve ${formatPrice(listing.priceChange.previousPrice, listing.currency)} (${new Date(listing.priceChange.observedAt).toLocaleDateString('cs-CZ')})`}

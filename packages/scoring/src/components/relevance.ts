@@ -5,7 +5,8 @@
  *  1. Diacritic normalisation  — "macbook" matches "MacBook" and Czech accented chars
  *  2. Query normalisation      — "iphone13" → "iphone 13", "macbook-pro" → "macbook pro"
  *  3. Czech + English stopwords stripped from query
- *  4. Short-token filter (≤ 2 chars) unless the full query is only short tokens
+ *  4. Short-token filter (≤ 2 chars) — except numbers and the pieces of a
+ *     letter+digit word, which are the model ("13", "s23", "m1")
  *  5. Phrase proximity bonus   — all query tokens adjacent → +0.15
  *  6. Exact number matching    — "13" doesn't hit "130" or "1300"
  *  7. Title-hit bonus (20%)    — tokens found in title rather than description
@@ -278,6 +279,31 @@ export function filterQueryTokens(tokens: string[], stopwords: Set<string>): str
   return filtered.length > 0 ? filtered : tokens;
 }
 
+/**
+ * The query tokens a listing is scored against. On top of filterQueryTokens
+ * (which drops everything of one or two characters) this keeps:
+ *
+ *  - every number — "iphone 13", "fenix 7", "playstation 5". Dropping them
+ *    made the query "iphone" and gave an iPhone 5 the same relevance as an
+ *    iPhone 13;
+ *  - short pieces of a word that mixes letters and digits — "s23" → "s" + "23",
+ *    "m1" → "m" + "1", "7x" → "7" + "x".
+ *
+ * The accessory guard keeps using filterQueryTokens: "Řemínek Garmin 22 mm"
+ * must still count as "for the queried product" without naming the model.
+ */
+export function scoringQueryTokens(query: string, stopwords: Set<string>): string[] {
+  const kept: string[] = [];
+  for (const word of stripDiacritics(query.toLowerCase()).split(/\s+/).filter(Boolean)) {
+    const parts = tokenize(word);
+    const mixed = parts.length > 1 && parts.some(isNumeric) && parts.some((p) => !isNumeric(p));
+    for (const t of parts) {
+      if (isNumeric(t) || mixed || (t.length > 2 && !stopwords.has(t))) kept.push(t);
+    }
+  }
+  return kept.length > 0 ? kept : tokenize(query);
+}
+
 // ─── Fuzzy matching ───────────────────────────────────────────────────────────
 //
 // Levenshtein distance ≤ 1 for tokens ≥ 5 chars.
@@ -373,20 +399,23 @@ export function scoreRelevance(
   const descTokens = description ? tokenize(description) : [];
   const docTokens = [...titleTokens, ...descTokens];
 
+  // Scored against the query with its model numbers kept ("13", "s" + "23")
+  const scoringTokens = scoringQueryTokens(query, stopwords);
+
   let hits = 0;
-  for (const qt of queryTokens) {
+  for (const qt of scoringTokens) {
     if (docTokens.some((dt) => tokenMatches(dt, qt))) hits++;
   }
 
-  const baseScore = hits / queryTokens.length;
+  const baseScore = hits / scoringTokens.length;
 
   let titleHits = 0;
-  for (const qt of queryTokens) {
+  for (const qt of scoringTokens) {
     if (titleTokens.some((dt) => tokenMatches(dt, qt))) titleHits++;
   }
-  const titleBonus = (titleHits / queryTokens.length) * 0.2;
+  const titleBonus = (titleHits / scoringTokens.length) * 0.2;
 
-  const proximity = phraseBonus(queryTokens, titleTokens);
+  const proximity = phraseBonus(scoringTokens, titleTokens);
 
   return Math.min(1, baseScore + titleBonus + proximity);
 }

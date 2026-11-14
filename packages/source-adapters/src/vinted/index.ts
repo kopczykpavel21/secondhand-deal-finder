@@ -20,6 +20,7 @@
  *
  *  Extractable signals (from JSON, not DOM):
  *    ✅  Title, price (CZK), currency
+ *    ✅  Price incl. buyer-protection fee (total_item_price) → totalPrice
  *    ✅  Condition (item_box.second_line: "XL · Velmi dobrý", …)
  *    ✅  Thumbnail image URL
  *    ✅  Direct listing URL (relative path — prefixed with baseUrl)
@@ -136,6 +137,10 @@ interface VintedItem {
   id: number;
   title: string;
   price: VintedPrice;
+  /** price + service_fee — what the buyer pays before shipping */
+  total_item_price?: VintedPrice;
+  /** Buyer-protection fee, mandatory on every purchase */
+  service_fee?: VintedPrice;
   url: string;             // relative since Oct 2026: "/items/123-mikina"
   photo: VintedPhoto;
   photos: VintedPhoto[];
@@ -260,6 +265,17 @@ export class VintedAdapter extends BaseAdapter {
         seenIds.add(id);
 
         const price = parseFloat(item.price?.amount ?? '0') || null;
+        // Vinted adds a mandatory buyer-protection fee on top of the listed
+        // price (≈ 5 % + a fixed part). Bazoš and Sbazar prices are what
+        // changes hands, so comparing Vinted's listed price with them makes
+        // every Vinted listing look ~5 % cheaper than it is. Only taken when it
+        // is in the same currency and not below the listed price.
+        const total = parseFloat(item.total_item_price?.amount ?? '0') || null;
+        const totalPrice =
+          total !== null && price !== null && total >= price &&
+          item.total_item_price?.currency_code === item.price?.currency_code
+            ? total
+            : null;
         const { sizeTitle, conditionText } = parseSecondLine(item.item_box?.second_line);
         const imageUrl = this.bestPhoto(item);
 
@@ -271,6 +287,7 @@ export class VintedAdapter extends BaseAdapter {
           title: item.title,
           description: null,
           price,
+          totalPrice,
           currency: item.price?.currency_code ?? 'CZK',
           location: null,
           postedAt: null,

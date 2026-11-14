@@ -1,5 +1,6 @@
 export { SearchCoordinator } from './search-coordinator.js';
 export { deduplicateListings } from './deduplicator.js';
+export { rankListings, getWeightsForSort, type RankedListings } from './ranking.js';
 export { logger } from './logger.js';
 export {
   createSearchCacheKey,

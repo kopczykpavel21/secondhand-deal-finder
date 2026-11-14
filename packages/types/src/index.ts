@@ -30,6 +30,13 @@ export interface NormalizedListing {
   title: string;
   description: string | null;
   price: number | null;
+  /**
+   * What the buyer actually pays when the marketplace adds a mandatory fee on
+   * top of the listed price (Vinted buyer protection). Scoring compares this;
+   * `price` stays the listed price so price history is not disturbed.
+   * Undefined/null when the listed price is the whole price.
+   */
+  totalPrice?: number | null;
   currency: string;
   location: string | null;
   postedAt: Date | null;
@@ -91,8 +98,32 @@ export interface ScoredListing extends NormalizedListing {
   dedupeGroup?: string;
   /** Price movement vs. the last recorded snapshot (set when history exists) */
   priceChange?: PriceChange;
+  /** How the price compares with like-for-like listings in the same search */
+  priceCheck?: PriceCheck;
   /** True when detail-page enrichment has been applied */
   enriched?: boolean;
+}
+
+/** Which listings a price was compared with — narrowest group with enough members */
+export type PriceBasis =
+  | 'same_spec'     // same model, variant and storage
+  | 'same_model'    // same model and variant
+  | 'model_family'  // same model, any variant
+  | 'search';       // every relevant listing in the search
+
+export interface PriceCheck {
+  /** Median price of the comparison group */
+  referencePrice: number;
+  /** How many listings the median is based on */
+  sampleSize: number;
+  basis: PriceBasis;
+  /** Listing price ÷ referencePrice (0.72 = 28 % under the median) */
+  ratio: number;
+  /**
+   * suspiciously_low — far below comparable listings; shown but not rewarded.
+   * placeholder — a filler price (1, 1 234); the real one is in the text.
+   */
+  flag?: 'suspiciously_low' | 'placeholder';
 }
 
 /** Price movement computed from listing snapshot history */

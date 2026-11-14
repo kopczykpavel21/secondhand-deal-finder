@@ -39,6 +39,12 @@ import {
   stripDiacritics,
   tokenize,
 } from './relevance.js';
+import {
+  QUERY_ALIASES,
+  createProductMatcher,
+  isPatternPrice,
+  type ProductMatcher,
+} from './product-signature.js';
 
 export type ListingKind =
   | 'for_parts'   // the product itself, sold broken / for parts
@@ -48,7 +54,8 @@ export type ListingKind =
   | 'media'       // a game or film for the console
   | 'service'     // repair / cleaning offer
   | 'wanted'      // "Koupím …" — a buyer's ad, not an offer
-  | 'packaging';  // the empty box
+  | 'packaging'   // the empty box
+  | 'other_model'; // another model of the same line: "iPhone 15" for "iphone 13"
 
 export type QueryFamily = 'vehicle' | 'device' | 'other';
 
@@ -184,12 +191,6 @@ const DEVICE_STRAP_NOUNS = set(['band', 'bands', 'loop']);
 /** Car-part words that mean something else outside a car search ("horské kolo"). */
 const NOT_A_PART_REQUEST = set(['kolo', 'kola', 'disk', 'disky']);
 
-/** Titles say "PS5" where the query says "PlayStation 5". */
-const QUERY_ALIASES: Record<string, string[]> = {
-  playstation: ['ps'],
-  ps: ['playstation'],
-};
-
 /** Leading words that say nothing about the item ("Prodám nový kryt …"). */
 const TITLE_FILLER = set([
   'prodam', 'prodej', 'prodavam', 'predam', 'nabizim', 'sprzedam', 'sprzedaje',
@@ -229,6 +230,9 @@ const FOR_PARTS_RE = new RegExp(
     'niesprawn\\w*', 'uszkodzon\\w*', 'nie dziala', 'defekt', 'defekte', 'defekter',
     'ersatzteilspender', 'bastler', 'for parts', 'not working', 'faulty',
     'icloud (lock|locked|blok\\w*|zamc\\w*)', '(blok\\w*|zamc\\w*) icloud',
+    // a blocked phone (operator / iCloud / stolen-list) is a parts donor;
+    // "odblokovaný" has no word boundary before "blok", "není blokovaný" is excluded
+    '(?<!neni )(?<!nie jest )blokovan\\w*', '(?<!nie jest )zablokowan\\w*',
   ].join('|') + ')\\b',
 );
 
@@ -363,6 +367,28 @@ export function analyzeQuery(query: string, market?: MarketLike): QueryIntent {
 
 // ─── The filter ───────────────────────────────────────────────────────────────
 
+/**
+ * True for "<something> <for-preposition> <the query phrase>": the query's
+ * words, in order and together, start within two words after a preposition
+ * that is not the title's first word. "Sedlo na silniční / horské kolo" for
+ * "horské kolo" → true; "Horské kolo na díly" → false (the phrase leads);
+ * "Dětské kolo pro děti" for "kolo pro děti" → false (the phrase is split).
+ */
+export function isMadeForQuery(
+  titleTokens: string[],
+  queryTokens: string[],
+  forPrepositions: Set<string>,
+): boolean {
+  if (queryTokens.length === 0) return false;
+  for (let i = 1; i < titleTokens.length - 1; i++) {
+    if (!forPrepositions.has(titleTokens[i])) continue;
+    for (let j = i + 1; j <= i + 3 && j + queryTokens.length <= titleTokens.length; j++) {
+      if (queryTokens.every((qt, k) => tokenMatches(titleTokens[j + k], qt))) return true;
+    }
+  }
+  return false;
+}
+
 /** Fewer categorised listings than this and "most of the results" means nothing. */
 const MIN_CATEGORISED_FOR_MAJORITY = 8;
 
@@ -402,6 +428,22 @@ const TOO_CHEAP_SHARE_OF_P10 = 0.5;
 const MIN_PRODUCTS_FOR_TOO_CHEAP = 10;
 
 /**
+ * When the query pins a model ("garmin fenix 7"), listings that name that
+ * model give its price directly, and one priced under this share of their
+ * upper quartile is not the product: a strap, a charger, the box, a dummy
+ * ("Garmin remen 22 mm", "Cutie Samsung Galaxy S23", "S23 Ultra atrapa").
+ * No word list needed, so it also catches the Croatian, Hungarian and
+ * Romanian listings Vinted mixes in. The upper quartile rather than the median
+ * because accessories that name the model are themselves in the sample and
+ * pull the median down. The device rule above ("a 2010 MacBook for 1 000 Kč
+ * is still a MacBook") does not apply here — a pinned model does not span 15
+ * years. Listings between this share and a normal price stay visible and are
+ * marked as suspiciously cheap by the price check instead.
+ */
+const FAR_BELOW_MODEL_SHARE = 0.15;
+const MIN_MODEL_LISTINGS = 8;
+
+/**
  * Build a filter for one search. Returns, per listing, the kind that makes it
  * "not the searched product", or null to keep it. `listings` is the whole
  * result set — used to tell whether parts/accessories are most of it.
@@ -410,6 +452,8 @@ export interface ListingKindFilter {
   (listing: ListingLike): ListingKind | null;
   /** Priced like the searched product itself — a bundle, not an accessory. */
   pricedLikeProduct(listing: ListingLike): boolean;
+  /** Model / variant / storage reader for this query — shared with the scorer. */
+  matcher: ProductMatcher;
 }
 
 export function createListingKindFilter(
@@ -424,6 +468,7 @@ export function createListingKindFilter(
   const baseQueryTokens = filterQueryTokens(tokenize(query), stopwords);
   const queryTokens = [...baseQueryTokens, ...baseQueryTokens.flatMap((t) => QUERY_ALIASES[t] ?? [])];
   const forPrepositions = set([...DEFAULT_FOR_PREPOSITIONS, ...(market?.forPrepositions ?? [])]);
+  const matcher = createProductMatcher(query, { family: intent.family, stopwords });
 
   // Share of each category kind among listings whose source has categories.
   const counts = new Map<ListingKind | null, number>();
@@ -462,6 +507,7 @@ export function createListingKindFilter(
       case 'service':
       case 'wanted':
       case 'packaging':
+      case 'other_model':
         return true;
       case 'toy':
         return strong;
@@ -493,6 +539,9 @@ export function createListingKindFilter(
     let start = 0;
     while (start < titleTokens.length - 1 && TITLE_FILLER.has(titleTokens[start])) start++;
     const itemTokens = titleTokens.slice(start);
+
+    // 0. Another model of the same product line
+    if (matcher.pinned && matcher.signature(listing.title).model === 'conflict') return 'other_model';
 
     // 1. Always-hidden title markers
     if (
@@ -550,6 +599,13 @@ export function createListingKindFilter(
       if (isAccessoryForQuery(itemTokens, queryTokens, nouns, forPrepositions, opts)) return kind;
     }
 
+    // 4b. "<something> na/pro <the whole query>" — made for the product, not
+    // the product: "Helma na horské kolo", "Dres na horské kolo", "Taška na
+    // kočárek". Needs no noun list, so it works for any search.
+    if (hides('accessory') && isMadeForQuery(itemTokens, baseQueryTokens, forPrepositions)) {
+      return 'accessory';
+    }
+
     // 5. Priced far below any real car
     if (
       intent.family === 'vehicle' && intent.pure && intent.wants.size === 0 && tooCheapBelow != null &&
@@ -558,10 +614,37 @@ export function createListingKindFilter(
     return null;
   };
 
-  const filter = (listing: ListingLike): ListingKind | null => {
+  const byWordsAndCategory = (listing: ListingLike): ListingKind | null => {
     const kind = classify(listing);
     if (kind && PRICE_RESCUABLE.has(kind) && pricedLikeProduct(listing)) return null;
     return kind;
   };
-  return Object.assign(filter, { pricedLikeProduct });
+
+  // Price of the pinned model itself: listings that name the model and that
+  // nothing above marked as a part, accessory or game. Pattern prices (1,
+  // 1 234) are placeholders for "price in the text" — left out here and left
+  // alone below; the price check deals with them.
+  const realPrice = (l: ListingLike) => l.price != null && l.price > 10 && !isPatternPrice(l.price);
+  const modelPrices = matcher.pinned && intent.wants.size === 0
+    ? listings
+        .filter((l) =>
+          realPrice(l) && matcher.signature(l.title).model === 'match' && byWordsAndCategory(l) === null)
+        .map((l) => l.price as number)
+        .sort((a, b) => a - b)
+    : [];
+  const farBelowModel =
+    modelPrices.length >= MIN_MODEL_LISTINGS
+      ? modelPrices[Math.floor((modelPrices.length - 1) * 0.75)] * FAR_BELOW_MODEL_SHARE
+      : null;
+
+  const filter = (listing: ListingLike): ListingKind | null => {
+    const kind = byWordsAndCategory(listing);
+    if (kind) return kind;
+    // 6. Priced far below the pinned model
+    if (farBelowModel != null && realPrice(listing) && (listing.price as number) < farBelowModel) {
+      return 'accessory';
+    }
+    return null;
+  };
+  return Object.assign(filter, { pricedLikeProduct, matcher });
 }

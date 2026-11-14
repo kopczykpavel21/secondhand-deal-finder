@@ -10,7 +10,20 @@ export {
   type QueryFamily,
   type QueryIntent,
 } from './components/listing-kind.js';
-export { scoreValueForMoney } from './components/value-for-money.js';
+export {
+  buildPriceReference,
+  scoreValueForMoney,
+  type PriceAssessment,
+  type PriceReference,
+  type PricedListing,
+} from './components/value-for-money.js';
+export {
+  createProductMatcher,
+  isPatternPrice,
+  type ModelMatch,
+  type ProductMatcher,
+  type ProductSignature,
+} from './components/product-signature.js';
 export { scoreCondition, normalizeCondition, conditionLabel } from './components/condition.js';
 export { scoreFreshness } from './components/freshness.js';
 export { scoreCompleteness } from './components/completeness.js';

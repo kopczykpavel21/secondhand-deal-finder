@@ -5,16 +5,12 @@ import type {
   SearchRequest,
   SearchResponse,
   SearchStreamEvent,
-  ScoredListing,
-  ScoringWeights,
   Source,
   SourceStatus,
-  SortOption,
 } from '@sdf/types';
 import { czMarket } from '@sdf/types';
 import type { SourceAdapter } from '@sdf/types';
-import { scoreListings, DEFAULT_WEIGHTS } from '@sdf/scoring';
-import { deduplicateListings } from './deduplicator.js';
+import { rankListings } from './ranking.js';
 import {
   createSearchCacheKey,
   DEFAULT_SEARCH_CACHE_TTL_MS,
@@ -42,17 +38,6 @@ class DeferredQueue<T> {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
-
-// Listings scoring below this relevance are dropped entirely. The accessory
-// guard caps spare-part/accessory listings at 0.05 ("Kryt pro iPhone 13",
-// "Nárazník Škoda Octavia"), and completely unrelated listings score 0 —
-// without a floor both still appear in results and dominate the "cheapest"
-// sort. A one-of-three token match scores ≥ 0.33, so genuine results pass.
-const MIN_RELEVANCE = 0.1;
-
-function dropIrrelevant(listings: ScoredListing[]): ScoredListing[] {
-  return listings.filter((l) => l.scoreComponents.relevance >= MIN_RELEVANCE);
-}
 
 // Hard wall-clock limit per source adapter.  Playwright adapters (Sbazar,
 // Vinted) can retry internally up to 2×, so keep this above 2 × 20 s = 40 s.
@@ -129,19 +114,9 @@ export class SearchCoordinator {
       }
     }
 
-    // Deduplicate
-    const { listings: deduped, groups: dedupeGroups } =
-      deduplicateListings(allListings, this.marketConfig.priceBucketSize);
-
-    // Score all listings (use relevance-heavy weights when requested)
-    const weights = getWeightsForSort(filters?.sortBy);
-    const scored = dropIrrelevant(scoreListings(deduped, query, weights, this.marketConfig));
-
-    // Post-scoring dedup: keep only the highest-scored listing per duplicate group
-    const dedupeFiltered = removeScoredDuplicates(scored, dedupeGroups);
-
-    // Sort according to user preference
-    const sorted = sortResults(dedupeFiltered, filters?.sortBy ?? 'best_deal');
+    // Dedupe, score, drop irrelevant, sort according to user preference
+    const { results: sorted, scored, dedupeGroups } =
+      rankListings(allListings, query, filters, this.marketConfig);
 
     // Take top N
     const topResults = sorted.slice(0, limit);
@@ -201,8 +176,6 @@ export class SearchCoordinator {
     const start = Date.now();
     const { query, filters } = request;
     const limit = Math.min(request.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
-    const weights = getWeightsForSort(filters?.sortBy);
-
     const activeSources: Source[] = filters?.sources?.length
       ? filters.sources
       : (Array.from(this.adapters.keys()) as Source[]);
@@ -231,10 +204,7 @@ export class SearchCoordinator {
       allStatuses.push(status);
 
       // Re-score everything accumulated so far
-      const { listings: deduped, groups } = deduplicateListings(allListings, this.marketConfig.priceBucketSize);
-      const scored = dropIrrelevant(scoreListings(deduped, query, weights, this.marketConfig));
-      const filtered = removeScoredDuplicates(scored, groups);
-      const sorted = sortResults(filtered, filters?.sortBy ?? 'best_deal');
+      const { results: sorted } = rankListings(allListings, query, filters, this.marketConfig);
 
       yield {
         type: 'source_done',
@@ -247,10 +217,7 @@ export class SearchCoordinator {
     }
 
     // Final event with complete metadata
-    const { listings: deduped, groups } = deduplicateListings(allListings, this.marketConfig.priceBucketSize);
-    const scored = dropIrrelevant(scoreListings(deduped, query, weights, this.marketConfig));
-    const filtered = removeScoredDuplicates(scored, groups);
-    const sorted = sortResults(filtered, filters?.sortBy ?? 'best_deal');
+    const { results: sorted } = rankListings(allListings, query, filters, this.marketConfig);
 
     const finalEvent: SearchStreamEvent = {
       type: 'complete',
@@ -323,97 +290,5 @@ export class SearchCoordinator {
         logs,
       };
     }
-  }
-}
-
-/**
- * After scoring, remove lower-ranked duplicates from the same dedupeGroup.
- * The pre-scoring deduplicator marks groups but intentionally keeps all members
- * so scoring can run over all of them. This pass then keeps only the winner.
- */
-function removeScoredDuplicates(
-  listings: ScoredListing[],
-  groups: Record<string, string[]>,
-): ScoredListing[] {
-  if (Object.keys(groups).length === 0) return listings;
-
-  // Build a set of ALL ids that are part of some dedupe group
-  const allGroupedIds = new Set(Object.values(groups).flat());
-
-  // For each group, find the listing with the highest score
-  const bestPerGroup = new Map<string, string>(); // groupId → winning listing id
-  for (const [groupId, ids] of Object.entries(groups)) {
-    let bestId = ids[0];
-    let bestScore = -1;
-    for (const id of ids) {
-      const l = listings.find((x) => x.id === id);
-      if (l && l.score > bestScore) {
-        bestScore = l.score;
-        bestId = id;
-      }
-    }
-    bestPerGroup.set(groupId, bestId);
-  }
-
-  return listings.filter((l) => {
-    // Not in any group → always keep
-    if (!allGroupedIds.has(l.id)) return true;
-    // In a group → keep only if this is the winner
-    const groupId = l.dedupeGroup;
-    if (!groupId) return true;
-    return bestPerGroup.get(groupId) === l.id;
-  });
-}
-
-/**
- * Returns scoring weights tuned for the requested sort mode.
- * 'most_relevant': price ignored entirely, relevance dominates.
- */
-function getWeightsForSort(sortBy?: SortOption): ScoringWeights {
-  if (sortBy === 'most_relevant') {
-    return {
-      ...DEFAULT_WEIGHTS,
-      relevance: 0.80,      // strong relevance signal
-      valueForMoney: 0,     // price completely ignored
-      condition: 0.10,
-      freshness: 0.08,
-      completeness: 0.06,
-      sellerTrust: 0.06,
-      engagement: 0.04,
-    };
-  }
-  return DEFAULT_WEIGHTS;
-}
-
-function sortResults(listings: ScoredListing[], sortBy: SortOption): ScoredListing[] {
-  switch (sortBy) {
-    case 'newest':
-      return [...listings].sort((a, b) => {
-        const ta = a.postedAt?.getTime() ?? 0;
-        const tb = b.postedAt?.getTime() ?? 0;
-        return tb - ta;
-      });
-    case 'cheapest':
-      return [...listings].sort((a, b) => {
-        // null/zero price = "price in description / on request" — sort last,
-        // those listings are not actually free.
-        const pa = a.price !== null && a.price > 0 ? a.price : Infinity;
-        const pb = b.price !== null && b.price > 0 ? b.price : Infinity;
-        return pa - pb;
-      });
-    case 'priciest':
-      return [...listings].sort((a, b) => {
-        if (a.price === null) return 1;
-        if (b.price === null) return -1;
-        return b.price - a.price;
-      });
-    case 'safest':
-      return [...listings].sort(
-        (a, b) => b.scoreComponents.sellerTrust - a.scoreComponents.sellerTrust,
-      );
-    case 'most_relevant':
-    case 'best_deal':
-    default:
-      return [...listings].sort((a, b) => b.score - a.score);
   }
 }
